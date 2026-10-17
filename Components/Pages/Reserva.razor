@@ -1,0 +1,1219 @@
+@page "/reserva"
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using BlazorAGS.Models
+@using BlazorAGS.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject BookingService BookingService
+@inject AuthService AuthService
+
+<PageTitle>Reserva de Cita | AGS Select</PageTitle>
+
+<section class="py-5 bg-black" style="min-height: 85vh;">
+    <div class="container py-lg-4">
+        
+        <!-- ENCABEZADO DE LA RESERVA -->
+        <div class="d-flex align-items-center justify-content-between mb-4 pb-3 border-bottom border-dark flex-wrap gap-3">
+            <div>
+                <a href="/" class="text-gray text-decoration-none small hover-red d-inline-flex align-items-center gap-2 mb-2">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    <span>Volver al Inicio</span>
+                </a>
+                <h2 class="display-6 fw-black text-white text-uppercase m-0">Agendar Cita & Servicio</h2>
+            </div>
+            <div class="badge bg-red px-3 py-2 text-uppercase" style="letter-spacing: 1px;">
+                <i class="fa-solid fa-shield-halved me-1"></i> Precios Dinámicos según Categoría
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(mensajeError))
+        {
+            <!-- BANNER DE ERROR EN VALIDACIÓN -->
+            <div class="alert alert-danger alert-dismissible fade show bg-danger bg-opacity-25 border-danger text-white mb-4 d-flex align-items-center gap-3" role="alert">
+                <i class="fa-solid fa-triangle-exclamation text-danger fs-3"></i>
+                <div>
+                    <strong class="d-block text-uppercase text-xs" style="letter-spacing: 1px;">Atención requerida</strong>
+                    <span>@mensajeError</span>
+                </div>
+                <button type="button" class="btn-close btn-close-white ms-auto" @onclick="() => mensajeError = null"></button>
+            </div>
+        }
+
+        @if (guardandoReserva)
+        {
+            <!-- OVERLAY DE CARGA CON ANIMACIÓN Y LOGO -->
+            <div class="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center bg-black bg-opacity-90" style="z-index: 9999; backdrop-filter: blur(8px);">
+                <div class="text-center p-4">
+                    <div class="spinner-border text-danger mb-4" style="width: 4rem; height: 4rem; border-width: 0.35em;" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <h4 class="text-white fw-bold text-uppercase mb-2" style="letter-spacing: 2px;">Procesando tu Reserva...</h4>
+                    <p class="text-gray text-sm mb-0">Guardando cita y servicios en el sistema AGS Select</p>
+                </div>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(mensajeError))
+        {
+            <!-- BANNER DE ERROR EN VALIDACIÓN -->
+            <div class="alert alert-danger alert-dismissible fade show bg-danger bg-opacity-25 border-danger text-white mb-4 d-flex align-items-center gap-3" role="alert">
+                <i class="fa-solid fa-triangle-exclamation text-danger fs-3"></i>
+                <div>
+                    <strong class="d-block text-uppercase text-xs" style="letter-spacing: 1px;">Atención requerida</strong>
+                    <span>@mensajeError</span>
+                </div>
+                <button type="button" class="btn-close btn-close-white ms-auto" @onclick="() => mensajeError = null"></button>
+            </div>
+        }
+
+        @if (reservaConfirmada)
+        {
+            <!-- CONFIRMACIÓN FINAL CON ANIMACIÓN FADE-IN Y ENTRADA SUAVE -->
+            <div class="booking-card text-center py-5 border-success animate-fade-in" style="max-width: 800px; margin: 0 auto; animation: fadeInUp 0.6s ease-out;">
+                <div class="mb-3">
+                    <div class="d-inline-flex align-items-center justify-content-center bg-success bg-opacity-10 text-success rounded-circle p-4 mb-2" style="width: 90px; height: 90px; border: 2px solid rgba(25, 135, 84, 0.4);">
+                        <i class="fa-solid fa-check display-4"></i>
+                    </div>
+                </div>
+                <h3 class="text-white fw-bold text-uppercase mb-2" style="letter-spacing: 1px;">¡Reserva Registrada Exitosamente!</h3>
+                <p class="text-gray mb-4 fs-6" style="max-width: 580px; margin: 0 auto;">
+                    Hemos procesado tu solicitud de servicio para <strong>@vehiculos.Count vehículo(s)</strong> a nombre de <strong>@clienteNombre</strong>. Nos pondremos en contacto al número <strong>@clienteTelefono</strong> para confirmar el horario.
+                </p>
+                <div class="p-3 bg-dark rounded-3 d-inline-block border border-secondary border-opacity-50 mb-4 px-4">
+                    <span class="text-gray text-xs d-block text-uppercase mb-1" style="letter-spacing: 1px;">MONTO ESTIMADO TOTAL EN TALLER</span>
+                    <span class="text-white fw-black fs-2">$@CalcularTotal().ToString("N2") DOP</span>
+                </div>
+                <div class="d-flex gap-3 justify-content-center">
+                    <button class="btn-ags-outline px-4" @onclick="NuevaReserva">NUEVA RESERVA</button>
+                    <a href="/" class="btn-ags-red px-4">VOLVER A INICIO</a>
+                </div>
+            </div>
+        }
+        else
+        {
+            <!-- INDICADOR DE PASOS (WIZARD STEPS) -->
+            <div class="row g-2 mb-4">
+                <div class="col-md-4">
+                    <div class="wizard-step-header d-flex align-items-center gap-3 cursor-pointer @(pasoActual == 1 ? "wizard-step-active border-danger" : "")" @onclick="() => IrAlPasoDirecto(1)">
+                        <span class="wizard-step-number">1</span>
+                        <div>
+                            <span class="wizard-step-title text-gray fw-bold d-block text-uppercase" style="font-size: 0.8rem;">Vehículo(s)</span>
+                            <span class="text-gray text-xs d-none d-lg-block">Categoría & datos</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="wizard-step-header d-flex align-items-center gap-3 cursor-pointer @(pasoActual == 2 ? "wizard-step-active border-danger" : "")" @onclick="() => IrAlPasoDirecto(2)">
+                        <span class="wizard-step-number">2</span>
+                        <div>
+                            <span class="wizard-step-title text-gray fw-bold d-block text-uppercase" style="font-size: 0.8rem;">Servicio & Paquete</span>
+                            <span class="text-gray text-xs d-none d-lg-block">Precios por categoría</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="wizard-step-header d-flex align-items-center gap-3 cursor-pointer @(pasoActual == 3 ? "wizard-step-active border-danger" : "")" @onclick="() => IrAlPasoDirecto(3)">
+                        <span class="wizard-step-number">3</span>
+                        <div>
+                            <span class="wizard-step-title text-gray fw-bold d-block text-uppercase" style="font-size: 0.8rem;">Contacto & Fecha</span>
+                            <span class="text-gray text-xs d-none d-lg-block">Tus datos y confirmación</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONTENIDO PRINCIPAL: PASOS DEL FORMULARIO Y RESUMEN SIDEBAR -->
+            <div class="row g-4">
+                
+                <!-- COLUMNA IZQUIERDA: PASOS DEL FORMULARIO -->
+                <div class="col-lg-8">
+                    
+                    @if (pasoActual == 1)
+                    {
+                        <!-- PASO 1: VEHÍCULOS -->
+                        <div class="booking-card mb-4">
+                            <h5 class="text-white fw-bold text-uppercase mb-4 pb-2 border-bottom border-secondary border-opacity-25 d-flex align-items-center justify-content-between">
+                                <span>Paso 1: Información del Vehículo</span>
+                                <span class="text-gray text-xs">Total: @vehiculos.Count vehículo(s)</span>
+                            </h5>
+
+                            @for (int i = 0; i < vehiculos.Count; i++)
+                            {
+                                var index = i;
+                                var vehiculo = vehiculos[index];
+
+                                <div class="p-3 bg-dark rounded-3 border @(intentoEnviarPaso1 && (!vehiculo.EsValido()) ? "border-danger" : "border-secondary border-opacity-25") mb-3">
+                                    <div class="d-flex align-items-center justify-content-between mb-3">
+                                        <span class="badge bg-red">Vehículo @(index + 1)</span>
+                                        <div class="d-flex gap-2">
+                                            @if (usuarioId.HasValue && misVehiculosGuardados.Any())
+                                            {
+                                                <button type="button" class="btn btn-outline-light btn-sm rounded-2 py-0 px-2 text-xs" @onclick="() => AbrirModalCargarVehiculo(index)">
+                                                    <i class="fa-solid fa-car-side me-1 text-red"></i> Cargar Mi Vehículo
+                                                </button>
+                                            }
+                                            @if (vehiculos.Count > 1)
+                                            {
+                                                <button type="button" class="btn btn-outline-danger btn-sm rounded-2 py-0 px-2" @onclick="() => RemoverVehiculo(index)">
+                                                    <i class="fa-solid fa-trash me-1"></i> Eliminar
+                                                </button>
+                                            }
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="ags-form-label">Categoría / Tipo de Vehículo *</label>
+                                            <select class="ags-form-select @(intentoEnviarPaso1 && string.IsNullOrWhiteSpace(vehiculo.Tipo) ? "is-invalid border-danger" : "")" @bind="vehiculo.Tipo">
+                                                @if (listaCategorias.Any())
+                                                {
+                                                    @foreach (var c in listaCategorias)
+                                                    {
+                                                        <option value="@c.Codigo">@c.Nombre</option>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <option value="Car">Automóvil (Car)</option>
+                                                    <option value="Jeepeta">Jeepeta</option>
+                                                    <option value="SUV">SUV</option>
+                                                    <option value="Camioneta">Camioneta</option>
+                                                    <option value="Minivan">Minivan</option>
+                                                    <option value="Camion">Camión</option>
+                                                    <option value="CamionDosEjes">Camión Dos Ejes</option>
+                                                    <option value="Trailer">Tráiler</option>
+                                                }
+                                            </select>
+                                            <span class="text-gray text-xs mt-1 d-block">
+                                                <i class="fa-solid fa-tag text-red me-1"></i>El precio de los servicios se ajusta automáticamente según esta categoría.
+                                            </span>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="ags-form-label">Marca *</label>
+                                            <input type="text" class="ags-form-input @(intentoEnviarPaso1 && string.IsNullOrWhiteSpace(vehiculo.Marca) ? "is-invalid border-danger" : "")" placeholder="Porsche, BMW, Toyota..." @bind="vehiculo.Marca" />
+                                            @if (intentoEnviarPaso1 && string.IsNullOrWhiteSpace(vehiculo.Marca))
+                                            {
+                                                <span class="text-danger text-xs mt-1 d-block"><i class="fa-solid fa-circle-exclamation me-1"></i>La marca es obligatoria.</span>
+                                            }
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="ags-form-label">Modelo *</label>
+                                            <input type="text" class="ags-form-input @(intentoEnviarPaso1 && string.IsNullOrWhiteSpace(vehiculo.Modelo) ? "is-invalid border-danger" : "")" placeholder="911 GT3, M3..." @bind="vehiculo.Modelo" />
+                                            @if (intentoEnviarPaso1 && string.IsNullOrWhiteSpace(vehiculo.Modelo))
+                                            {
+                                                <span class="text-danger text-xs mt-1 d-block"><i class="fa-solid fa-circle-exclamation me-1"></i>El modelo es obligatorio.</span>
+                                            }
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="ags-form-label">Año</label>
+                                            <input type="text" class="ags-form-input" placeholder="2024" @bind="vehiculo.Anio" />
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="ags-form-label">Color</label>
+                                            <input type="text" class="ags-form-input" placeholder="Negro Mate..." @bind="vehiculo.Color" />
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="mt-3">
+                                <button type="button" class="btn-ags-outline w-100 justify-content-center" @onclick="AgregarVehiculo" disabled="@(vehiculos.Count >= 5)">
+                                    <i class="fa-solid fa-plus text-red me-1"></i>
+                                    <span>Añadir Otro Vehículo</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end">
+                            <button type="button" class="btn-ags-red py-3 px-5" @onclick="ValidarYContinuarPaso1">
+                                <span>Continuar a Servicios</span>
+                                <i class="fa-solid fa-arrow-right ms-2"></i>
+                            </button>
+                        </div>
+                    }
+                    else if (pasoActual == 2)
+                    {
+                        <!-- PASO 2: SERVICIOS CON PESTAÑAS (TABS POR VEHÍCULO) -->
+                        <div class="booking-card mb-4">
+                            <h5 class="text-white fw-bold text-uppercase mb-3 pb-2 border-bottom border-secondary border-opacity-25">
+                                Paso 2: Selecciona el Tratamiento para Cada Vehículo
+                            </h5>
+
+                            <!-- NAVEGACIÓN DE PESTAÑAS POR VEHÍCULO -->
+                            @if (vehiculos.Count > 1)
+                            {
+                                <div class="d-flex gap-2 mb-4 overflow-auto pb-2">
+                                    @for (int i = 0; i < vehiculos.Count; i++)
+                                    {
+                                        var idx = i;
+                                        var veh = vehiculos[idx];
+                                        var isSelectedTab = vehiculoActivoIdx == idx;
+                                        var tieneServicio = veh.GrupoSeleccionado != null;
+
+                                        <button type="button" class="vehicle-tab-btn @(isSelectedTab ? "active" : "") @(intentoEnviarPaso2 && !tieneServicio ? "border-danger text-danger" : "")" @onclick="() => CambiarVehiculoActivo(idx)">
+                                            <i class="fa-solid fa-car text-red me-1"></i>
+                                            <span>Vehículo @(idx + 1): @(string.IsNullOrEmpty(veh.Marca) ? "Auto" : $"{veh.Marca} {veh.Modelo}")</span>
+                                            <span class="badge bg-secondary text-white ms-1 text-xs">@veh.Tipo</span>
+                                            @if (tieneServicio)
+                                            {
+                                                <i class="fa-solid fa-check text-success ms-1"></i>
+                                            }
+                                            else
+                                            {
+                                                <i class="fa-solid fa-triangle-exclamation text-warning ms-1" title="Pendiente de tratamiento"></i>
+                                            }
+                                        </button>
+                                    }
+                                </div>
+                            }
+
+                            <!-- VEHÍCULO ACTUALMENTE SELECCIONADO EN PESTAÑA -->
+                            @{
+                                var vehiculoActual = vehiculos[Math.Min(vehiculoActivoIdx, vehiculos.Count - 1)];
+                            }
+
+                            <div class="p-3 bg-dark rounded-3 border @(intentoEnviarPaso2 && vehiculoActual.GrupoSeleccionado == null ? "border-danger" : "border-danger border-opacity-50") mb-4">
+                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                    <div>
+                                        <span class="badge bg-red me-2">CONFIGURANDO VEHÍCULO @(vehiculoActivoIdx + 1) DE @vehiculos.Count</span>
+                                        <span class="text-white fw-bold fs-5">@(string.IsNullOrEmpty(vehiculoActual.Marca) ? "Sin Marca / Modelo" : $"{vehiculoActual.Marca} {vehiculoActual.Modelo} ({vehiculoActual.Anio})")</span>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="badge bg-dark border border-danger text-red px-3 py-2 text-uppercase">
+                                            Categoría: @vehiculoActual.Tipo
+                                        </span>
+                                    </div>
+                                </div>
+                                @if (intentoEnviarPaso2 && vehiculoActual.GrupoSeleccionado == null)
+                                {
+                                    <div class="text-danger text-xs mt-2 fw-bold">
+                                        <i class="fa-solid fa-triangle-exclamation me-1"></i>Debes seleccionar un paquete de tratamiento para este vehículo.
+                                    </div>
+                                }
+                            </div>
+
+                            @if (cargandoServicios)
+                            {
+                                <div class="text-center py-4">
+                                    <div class="spinner-border text-danger" role="status"></div>
+                                    <p class="text-gray text-xs mt-2">Cargando catálogo de servicios...</p>
+                                </div>
+                            }
+                            else
+                            {
+                                <label class="ags-form-label mb-3">Escoge un Grupo de Tratamiento (Precios ajustados para categoría <strong>@vehiculoActual.Tipo</strong>): *</label>
+
+                                <div class="row g-3">
+                                    @foreach (var grupo in gruposServicios)
+                                    {
+                                        var isSelected = vehiculoActual.GrupoSeleccionado?.Id == grupo.Id;
+                                        var precioCalculado = grupo.GetPriceForVehicleType(vehiculoActual.Tipo);
+
+                                        <div class="col-md-6">
+                                            <div class="service-option-card @(isSelected ? "selected" : "")" @onclick="() => SeleccionarGrupo(vehiculoActual, grupo)">
+                                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                                    <span class="text-white fw-bold small">@grupo.Name</span>
+                                                    <i class="fa-solid @(isSelected ? "fa-circle-check text-red fs-5" : "fa-circle text-gray opacity-50")"></i>
+                                                </div>
+                                                @if (!string.IsNullOrEmpty(grupo.Description))
+                                                {
+                                                    <p class="text-gray text-xs mb-2" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                                        @grupo.Description
+                                                    </p>
+                                                }
+                                                <div class="d-flex align-items-center justify-content-between mt-auto pt-2 border-top border-secondary border-opacity-25">
+                                                    <span class="text-red font-bold fs-5">$@precioCalculado.ToString("N2") DOP</span>
+                                                    <span class="text-gray text-xs">@vehiculoActual.Tipo</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+
+                                <!-- SERVICIOS ADICIONALES SI EL GRUPO TIENE -->
+                                @if (vehiculoActual.GrupoSeleccionado != null && vehiculoActual.GrupoSeleccionado.AdditionalServices.Any())
+                                {
+                                    <div class="mt-4 pt-3 border-top border-secondary border-opacity-25">
+                                        <h6 class="text-white fw-bold text-uppercase mb-3">
+                                            <i class="fa-solid fa-puzzle-piece text-red me-2"></i>Servicios Adicionales Disponibles para @vehiculoActual.GrupoSeleccionado.Name:
+                                        </h6>
+
+                                        <div class="row g-2">
+                                            @foreach (var add in vehiculoActual.GrupoSeleccionado.AdditionalServices)
+                                            {
+                                                var isAddSelected = vehiculoActual.AdicionalesSeleccionados.Any(a => a.Id == add.Id);
+                                                var addPrecio = add.GetPriceForVehicleType(vehiculoActual.Tipo);
+
+                                                <div class="col-md-6">
+                                                    <div class="p-3 bg-dark rounded-3 border @(isAddSelected ? "border-danger bg-danger bg-opacity-10" : "border-secondary border-opacity-25") cursor-pointer d-flex align-items-center justify-content-between" @onclick="() => ToggleAdicional(vehiculoActual, add)">
+                                                        <div>
+                                                            <div class="form-check m-0">
+                                                                <input class="form-check-input bg-dark border-secondary" type="checkbox" checked="@isAddSelected" />
+                                                                <label class="form-check-label text-white fw-bold text-xs ms-1">@add.Name</label>
+                                                            </div>
+                                                            @if (!string.IsNullOrEmpty(add.Description))
+                                                            {
+                                                                <span class="text-gray text-xs d-block ms-4">@add.Description</span>
+                                                            }
+                                                        </div>
+                                                        <span class="text-red fw-bold text-sm ms-2">+$@addPrecio.ToString("N2")</span>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            }
+
+                        </div>
+
+                        <!-- BARRA NAVEGACIÓN INFERIOR DE 2 BOTONES -->
+                        <div class="d-flex justify-content-between gap-3 flex-wrap">
+                            @if (vehiculoActivoIdx > 0)
+                            {
+                                <button type="button" class="btn-ags-outline" @onclick="() => CambiarVehiculoActivo(vehiculoActivoIdx - 1)">
+                                    <i class="fa-solid fa-arrow-left me-2"></i>
+                                    <span>Vehículo Anterior</span>
+                                </button>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn-ags-outline" @onclick="() => IrAlPaso(1)">
+                                    <i class="fa-solid fa-arrow-left me-2"></i>
+                                    <span>Atrás a Vehículos</span>
+                                </button>
+                            }
+
+                            @if (vehiculoActivoIdx < vehiculos.Count - 1)
+                            {
+                                <button type="button" class="btn-ags-red py-3 px-4" @onclick="SiguienteVehiculoOPaso">
+                                    <span>Siguiente: Vehículo @(vehiculoActivoIdx + 2)</span>
+                                    <i class="fa-solid fa-arrow-right ms-2"></i>
+                                </button>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn-ags-red py-3 px-5" @onclick="ValidarYContinuarPaso2">
+                                    <span>Continuar a Contacto</span>
+                                    <i class="fa-solid fa-arrow-right ms-2"></i>
+                                </button>
+                            }
+                        </div>
+                    }
+                    else if (pasoActual == 3)
+                    {
+                        <!-- PASO 3: CONTACTO Y FECHA -->
+                        <div class="booking-card mb-4">
+                            <h5 class="text-white fw-bold text-uppercase mb-4 pb-2 border-bottom border-secondary border-opacity-25">
+                                Paso 3: Información de Contacto y Fecha Preferida
+                            </h5>
+
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-6">
+                                    <label class="ags-form-label">Nombre Completo *</label>
+                                    <input type="text" class="ags-form-input @(intentoEnviarPaso3 && string.IsNullOrWhiteSpace(clienteNombre) ? "is-invalid border-danger" : "")" placeholder="Tu Nombre y Apellido" @bind="clienteNombre" />
+                                    @if (intentoEnviarPaso3 && string.IsNullOrWhiteSpace(clienteNombre))
+                                    {
+                                        <span class="text-danger text-xs mt-1 d-block"><i class="fa-solid fa-circle-exclamation me-1"></i>El nombre es obligatorio.</span>
+                                    }
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="ags-form-label">Correo Electrónico *</label>
+                                    <input type="email" class="ags-form-input @(intentoEnviarPaso3 && (!EsCorreoValido(clienteCorreo)) ? "is-invalid border-danger" : "")" placeholder="correo@ejemplo.com" @bind="clienteCorreo" />
+                                    @if (intentoEnviarPaso3 && !EsCorreoValido(clienteCorreo))
+                                    {
+                                        <span class="text-danger text-xs mt-1 d-block"><i class="fa-solid fa-circle-exclamation me-1"></i>Ingresa un correo electrónico válido.</span>
+                                    }
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="ags-form-label">Teléfono / WhatsApp *</label>
+                                    <input type="tel" class="ags-form-input @(intentoEnviarPaso3 && string.IsNullOrWhiteSpace(clienteTelefono) ? "is-invalid border-danger" : "")" placeholder="(809) 000-0000" @bind="clienteTelefono" />
+                                    @if (intentoEnviarPaso3 && string.IsNullOrWhiteSpace(clienteTelefono))
+                                    {
+                                        <span class="text-danger text-xs mt-1 d-block"><i class="fa-solid fa-circle-exclamation me-1"></i>El teléfono de contacto es obligatorio.</span>
+                                    }
+                                </div>
+                                 <div class="col-12">
+                                     <label class="ags-form-label mb-3">Fecha y Horario Preferido *</label>
+
+                                     <!-- SELECTOR WRAPPER -->
+                                     <div style="background: #111; border-radius: 16px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden;">
+
+                                         <!-- ROW: CALENDAR + TIME -->
+                                         <div class="d-flex flex-column flex-lg-row">
+
+                                             <!-- CALENDAR PANEL -->
+                                             <div style="flex: 1; padding: 20px 24px; border-right: 1px solid rgba(255,255,255,0.06);">
+
+                                                 <!-- MONTH NAV -->
+                                                 <div class="d-flex align-items-center justify-content-between mb-4">
+                                                     <button type="button"
+                                                             class="btn p-0 text-white"
+                                                             style="width:32px; height:32px; background:rgba(255,255,255,0.06); border-radius:8px; border:none;"
+                                                             @onclick="MesAnterior"
+                                                             disabled="@(calMes <= DateTime.Today.Month && calAnio <= DateTime.Today.Year)">
+                                                         <i class="fa-solid fa-chevron-left" style="font-size:11px;"></i>
+                                                     </button>
+                                                     <span class="text-white fw-bold text-capitalize" style="font-size:0.95rem; letter-spacing:0.5px;">
+                                                         @(new System.DateTime(calAnio, calMes, 1).ToString("MMMM yyyy", new System.Globalization.CultureInfo("es-ES")))
+                                                     </span>
+                                                     <button type="button"
+                                                             class="btn p-0 text-white"
+                                                             style="width:32px; height:32px; background:rgba(255,255,255,0.06); border-radius:8px; border:none;"
+                                                             @onclick="MesSiguiente">
+                                                         <i class="fa-solid fa-chevron-right" style="font-size:11px;"></i>
+                                                     </button>
+                                                 </div>
+
+                                                 <!-- DAY HEADERS -->
+                                                 <div style="display:grid; grid-template-columns: repeat(7, 1fr); gap:2px; margin-bottom:6px;">
+                                                     @foreach (var h in new[] { "Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do" })
+                                                     {
+                                                         <div class="text-center" style="padding: 4px 0;">
+                                                             <span style="font-size:0.7rem; font-weight:700; color:rgba(255,255,255,0.3); text-transform:uppercase; letter-spacing:1px;">@h</span>
+                                                         </div>
+                                                     }
+                                                 </div>
+                                                 <!-- DAYS GRID -->
+                                                 @{
+                                                     var _primerDia = new System.DateTime(calAnio, calMes, 1);
+                                                     var _offset = ((int)_primerDia.DayOfWeek + 6) % 7;
+                                                     var _totalDias = System.DateTime.DaysInMonth(calAnio, calMes);
+                                                 }
+                                                 <div style="display:grid; grid-template-columns: repeat(7, 1fr); gap:4px;">
+                                                     @for (int _e = 0; _e < _offset; _e++)
+                                                     {
+                                                         <div></div>
+                                                     }
+                                                     @for (int _d = 1; _d <= _totalDias; _d++)
+                                                     {
+                                                         var _dia = _d;
+                                                         var _fecha = new System.DateTime(calAnio, calMes, _dia);
+                                                         var _totalBloqueado = EsDiaTotalmenteBloqueado(_fecha);
+                                                         var _pasado = _fecha.Date < System.DateTime.Today;
+                                                         var _deshabilitado = _pasado || _totalBloqueado;
+                                                         var _hoy = _fecha.Date == System.DateTime.Today;
+                                                         var _selec = _fecha.Date == fechaSeleccionada.Date;
+
+                                                         <div class="text-center">
+                                                             <button type="button"
+                                                                     disabled="@_deshabilitado"
+                                                                     @onclick="() => SeleccionarFecha(_fecha)"
+                                                                     title="@(_totalBloqueado && !_pasado ? "Día completamente lleno" : "")"
+                                                                     style="width:36px; height:36px; border-radius:50%; border:none; font-size:0.82rem; font-weight:@(_selec || _hoy ? "700" : "400"); cursor:@(_deshabilitado ? "not-allowed" : "pointer");
+                                                                            background:@(_selec ? "#dc3545" : "transparent");
+                                                                            color:@(_selec ? "#fff" : _deshabilitado ? "rgba(255,255,255,0.18)" : _hoy ? "#dc3545" : "#e0e0e0");
+                                                                            text-decoration:@(_totalBloqueado && !_pasado ? "line-through" : "none");
+                                                                            box-shadow:@(_hoy && !_selec ? "inset 0 0 0 1.5px #dc3545" : "none");
+                                                                            transition: background 0.15s;">
+                                                                 @_dia
+                                                             </button>
+                                                         </div>
+                                                     }
+                                                 </div>
+                                             </div>
+                                             <!-- TIME SLOTS PANEL -->
+                                             <div style="width:100%; max-width:200px; padding:20px 16px; background:#0d0d0d; display:flex; flex-direction:column; gap:6px;">
+                                                 <p class="text-uppercase mb-3" style="font-size:0.68rem; font-weight:700; color:rgba(255,255,255,0.35); letter-spacing:1.5px;">
+                                                     <i class="fa-solid fa-clock me-1"></i>Horario
+                                                 </p>
+                                                 @foreach (var slot in horariosDisponibles)
+                                                 {
+                                                     var _slotSel = horaSeleccionada == slot;
+                                                     var _bloqueado = EsHoraBloqueada(fechaSeleccionada, slot);
+                                                     <button type="button"
+                                                             disabled="@_bloqueado"
+                                                             @onclick="() => SeleccionarHora(slot)"
+                                                             style="border-radius:10px; border:none; padding:10px 12px; font-size:0.82rem; font-weight:600; text-align:left; cursor:@(_bloqueado ? "not-allowed" : "pointer"); transition: all 0.15s;
+                                                                    background:@(_slotSel ? "#dc3545" : _bloqueado ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.05)");
+                                                                    color:@(_slotSel ? "#fff" : _bloqueado ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.7)");
+                                                                    opacity:@(_bloqueado ? "0.4" : "1");">
+                                                         <i class="fa-solid @(_bloqueado ? "fa-ban text-danger" : _slotSel ? "fa-check-circle" : "fa-circle") me-2"
+                                                            style="font-size:0.7rem; opacity:@(_slotSel || _bloqueado ? "1" : "0.4");"></i>
+                                                         <span style="text-decoration:@(_bloqueado ? "line-through" : "none")">@slot</span>
+                                                         @if (_bloqueado)
+                                                         {
+                                                             <span class="ms-1 text-danger fw-normal" style="font-size:0.65rem;">(Ocupado)</span>
+                                                         }
+                                                     </button>
+                                                 }
+                                             </div>
+                                         </div>
+
+                                         <!-- FOOTER SUMMARY -->
+                                         <div style="padding:14px 24px; border-top:1px solid rgba(255,255,255,0.06); background:rgba(220,53,69,0.06); display:flex; align-items:center; gap:12px;">
+                                             <i class="fa-solid fa-calendar-check" style="color:#dc3545; font-size:1.1rem;"></i>
+                                             <div>
+                                                 <span style="font-size:0.65rem; font-weight:700; color:rgba(255,255,255,0.4); text-transform:uppercase; letter-spacing:1px; display:block;">
+                                                     Turno seleccionado
+                                                 </span>
+                                                 <strong class="text-white" style="font-size:0.9rem;">
+                                                     @(System.Globalization.CultureInfo.GetCultureInfo("es-ES").TextInfo.ToTitleCase(
+                                                         fechaSeleccionada.ToString("dddd d 'de' MMMM yyyy", new System.Globalization.CultureInfo("es-ES"))))
+                                                     &nbsp;·&nbsp;@horaSeleccionada
+                                                 </strong>
+                                             </div>
+                                         </div>
+
+                                     </div>
+                                 </div>
+                                <div class="col-12">
+                                    <label class="ags-form-label">Opción de Entrega</label>
+                                    <select class="ags-form-select" @bind="opcionEntrega">
+                                        @if (listaOpcionesEntrega.Any())
+                                        {
+                                            @foreach (var opt in listaOpcionesEntrega)
+                                            {
+                                                <option value="@opt.Nombre">@opt.Nombre @(opt.CostoAdicional > 0 ? $" (+${opt.CostoAdicional:N2} DOP)" : " (Sin Costo)")</option>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <option value="Taller">Entrega Directa en Taller</option>
+                                            <option value="PickUp">Servicio PickUp (Recogida a Domicilio)</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <button type="button" class="btn-ags-outline" @onclick="() => IrAlPaso(2)">
+                                <i class="fa-solid fa-arrow-left me-2"></i>
+                                <span>Atrás</span>
+                            </button>
+                            <button type="button" class="btn-ags-red py-3 px-5" @onclick="ConfirmarReserva">
+                                <i class="fa-solid fa-calendar-check me-2"></i>
+                                <span>Confirmar Reserva</span>
+                            </button>
+                        </div>
+                    }
+
+                </div>
+
+                <!-- COLUMNA DERECHA: SIDEBAR DE RESUMEN EN TIEMPO REAL -->
+                <div class="col-lg-4">
+                    <div class="booking-card position-sticky" style="top: 90px;">
+                        <h6 class="text-white fw-bold text-uppercase mb-3 pb-2 border-bottom border-secondary border-opacity-25 d-flex align-items-center justify-content-between">
+                            <span>Resumen de Cita</span>
+                            <i class="fa-solid fa-receipt text-red"></i>
+                        </h6>
+
+                        <!-- DETALLE POR VEHÍCULO -->
+                        <div class="d-flex flex-column gap-3 mb-4">
+                            @for (int i = 0; i < vehiculos.Count; i++)
+                            {
+                                var veh = vehiculos[i];
+                                var isCurrent = vehiculoActivoIdx == i && pasoActual == 2;
+                                <div class="p-2 rounded-2 bg-dark border @(isCurrent ? "border-danger" : "border-dark")">
+                                    <div class="d-flex align-items-center justify-content-between text-xs mb-1">
+                                        <span class="text-white fw-bold">Vehículo @(i + 1): @(string.IsNullOrEmpty(veh.Marca) ? "Pendiente" : $"{veh.Marca} {veh.Modelo}")</span>
+                                        <span class="text-red font-bold">$@veh.Subtotal.ToString("N2")</span>
+                                    </div>
+                                    <div class="d-flex align-items-center justify-content-between text-xs">
+                                        <span class="text-gray text-xs">Categoría: <strong>@veh.Tipo</strong></span>
+                                        <span class="text-gray text-xs">@(veh.GrupoSeleccionado == null ? "Sin Tratamiento" : veh.GrupoSeleccionado.Name)</span>
+                                    </div>
+                                    @if (veh.AdicionalesSeleccionados.Any())
+                                    {
+                                        <div class="mt-1 pt-1 border-top border-secondary border-opacity-25 text-xs text-gray">
+                                            + @veh.AdicionalesSeleccionados.Count adicional(es)
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        @if (usuarioId.HasValue && tieneLavadoGratis)
+                        {
+                            <div class="p-3 mb-3 rounded-3 bg-success bg-opacity-10 border border-success text-start">
+                                <span class="text-success text-xs fw-bold d-block mb-1">
+                                    <i class="fa-solid fa-gift me-1"></i> ¡Lavado Gratis por Membresía VIP!
+                                </span>
+                                <span class="text-white text-xs d-block">
+                                    Has completado 7 lavados. Este servicio de lavado no tendrá costo gracias a tu tarjeta de fidelización.
+                                </span>
+                            </div>
+                        }
+
+                        <div class="pt-3 border-top border-secondary border-opacity-25 mb-4">
+                            <span class="text-gray text-xs d-block text-uppercase">MONTO ESTIMADO TOTAL:</span>
+                            @if (usuarioId.HasValue && tieneLavadoGratis)
+                            {
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-decoration-line-through text-gray fs-5">$@CalcularTotalSinDescuento().ToString("N2") DOP</span>
+                                    <span class="text-success fw-black fs-2 d-block">$0.00 DOP</span>
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="text-white fw-black fs-2 d-block">$@CalcularTotal().ToString("N2") DOP</span>
+                            }
+                        </div>
+
+                        <div class="p-3 bg-dark rounded-3 text-start border border-secondary border-opacity-25">
+                            <span class="text-white text-xs fw-bold d-block mb-1"><i class="fa-solid fa-circle-info text-info me-1"></i> Garantía AGS Select</span>
+                            <span class="text-gray text-xs d-block">No pagas nada ahora. El pago se realiza al entregar tu vehículo en taller.</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        }
+
+    </div>
+</section>
+
+<!-- MODAL SELECCIONAR VEHÍCULO GUARDADO -->
+@if (modalCargarVehiculoVisible)
+{
+    <div class="auth-overlay" @onclick="CerrarModalCargarVehiculo">
+        <div class="auth-modal p-4 text-white" style="max-width: 500px;" @onclick:stopPropagation="true">
+            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom border-dark">
+                <h5 class="text-white fw-bold mb-0">Seleccionar Vehículo Guardado</h5>
+                <button type="button" class="btn-close btn-close-white" @onclick="CerrarModalCargarVehiculo"></button>
+            </div>
+            <p class="text-gray text-xs mb-3">Haz clic en uno de tus vehículos guardados para autocompletar este formulario:</p>
+
+            <div class="d-flex flex-column gap-2 mb-3 style-scrollbar" style="max-height: 300px; overflow-y: auto;">
+                @foreach (var v in misVehiculosGuardados)
+                {
+                    <button type="button" class="btn btn-dark text-start p-3 border border-secondary border-opacity-25 hover-border-danger d-flex align-items-center justify-content-between text-white rounded-3" @onclick="() => SeleccionarVehiculoGuardado(v)">
+                        <div>
+                            <strong class="d-block text-white fs-6">@v.Marca @v.Modelo</strong>
+                            <span class="text-gray text-xs">@(string.IsNullOrEmpty(v.Anio) ? "Año N/A" : v.Anio) • @(string.IsNullOrEmpty(v.Color) ? "Color N/A" : v.Color) • @v.Tipo</span>
+                        </div>
+                        <i class="fa-solid fa-circle-chevron-right text-red fs-5"></i>
+                    </button>
+                }
+            </div>
+
+            <div class="text-end">
+                <button type="button" class="btn btn-outline-secondary text-white py-1 px-3 text-xs rounded-3" @onclick="CerrarModalCargarVehiculo">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private int pasoActual = 1;
+    private int vehiculoActivoIdx = 0;
+
+    private string clienteNombre = "";
+    private string clienteCorreo = "";
+    private string clienteTelefono = "";
+    private DateTime fechaReserva = DateTime.Now.AddDays(1);
+    private DateTime fechaSeleccionada = DateTime.Today.AddDays(1);
+    private string horaSeleccionada = "09:30 AM";
+    private int calMes = DateTime.Today.Month;
+    private int calAnio = DateTime.Today.Year;
+    private string opcionEntrega = "Taller";
+    private bool reservaConfirmada = false;
+    private bool cargandoServicios = true;
+    private string? mensajeError = null;
+
+    private bool intentoEnviarPaso1 = false;
+    private bool intentoEnviarPaso2 = false;
+    private bool intentoEnviarPaso3 = false;
+
+    private List<string> horariosDisponibles = new()
+    {
+        "08:00 AM",
+        "09:30 AM",
+        "11:00 AM",
+        "01:30 PM",
+        "03:00 PM",
+        "04:30 PM"
+    };
+
+    public class VehiculoModel
+    {
+        public string Tipo { get; set; } = "Car";
+        public string Marca { get; set; } = "";
+        public string Modelo { get; set; } = "";
+        public string Anio { get; set; } = "";
+        public string Color { get; set; } = "";
+        public ServiceGroup? GrupoSeleccionado { get; set; }
+        public List<AdditionalService> AdicionalesSeleccionados { get; set; } = new();
+
+        public bool EsValido()
+        {
+            return !string.IsNullOrWhiteSpace(Tipo) &&
+                   !string.IsNullOrWhiteSpace(Marca) &&
+                   !string.IsNullOrWhiteSpace(Modelo);
+        }
+
+        public decimal Subtotal
+        {
+            get
+            {
+                decimal total = 0;
+                if (GrupoSeleccionado != null)
+                {
+                    total += GrupoSeleccionado.GetPriceForVehicleType(Tipo);
+                }
+                foreach (var add in AdicionalesSeleccionados)
+                {
+                    total += add.GetPriceForVehicleType(Tipo);
+                }
+                return total;
+            }
+        }
+    }
+
+    private List<VehiculoModel> vehiculos = new() { new VehiculoModel() };
+    private List<ServiceGroup> gruposServicios = new();
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthStateTask { get; set; }
+
+    private int? usuarioId = null;
+
+    private List<DateTime> fechasHorasReservadas = new();
+
+    private List<VehiculoDto> misVehiculosGuardados = new();
+    private bool modalCargarVehiculoVisible = false;
+    private int vehiculoIndiceAAutoLlenar = 0;
+
+    private List<CategoriaVehiculoDto> listaCategorias = new();
+    private List<OpcionEntregaDto> listaOpcionesEntrega = new();
+
+    private bool tieneLavadoGratis = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        cargandoServicios = true;
+        try
+        {
+            gruposServicios = await BookingService.GetActiveServiceGroupsAsync();
+            fechasHorasReservadas = await BookingService.ObtenerFechasHorasReservadasAsync();
+            bloqueosCalendario = await BookingService.ObtenerBloqueosCalendarioAsync();
+            listaCategorias = await BookingService.ObtenerCategoriasVehiculoAsync();
+            listaOpcionesEntrega = await BookingService.ObtenerOpcionesEntregaAsync();
+        }
+        finally
+        {
+            cargandoServicios = false;
+        }
+
+        if (AuthStateTask != null)
+        {
+            var authState = await AuthStateTask;
+            var user = authState.User;
+            if (user.Identity != null && user.Identity.IsAuthenticated)
+            {
+                var idClaim = user.FindFirst(ClaimTypes.NameIdentifier);
+                if (idClaim != null && int.TryParse(idClaim.Value, out int id))
+                {
+                    usuarioId = id;
+                    var dbUser = await AuthService.ObtenerUsuarioPorIdAsync(id);
+                    if (dbUser != null)
+                    {
+                        clienteNombre = dbUser.Nombre;
+                        clienteCorreo = dbUser.Correo;
+                        clienteTelefono = dbUser.Telefono ?? "";
+                        tieneLavadoGratis = dbUser.LavadosCompletados >= 7;
+                    }
+                    else
+                    {
+                        clienteNombre = user.Identity.Name ?? "";
+                        clienteCorreo = user.FindFirst(ClaimTypes.Email)?.Value ?? "";
+                    }
+
+                    misVehiculosGuardados = await BookingService.ObtenerVehiculosPorUsuarioAsync(id);
+                }
+            }
+        }
+
+        // Asegurar que la fecha inicial seleccionada no esté completamente llena o en el pasado
+        AsegurarFechaValidaInicial();
+    }
+
+    private void AbrirModalCargarVehiculo(int index)
+    {
+        vehiculoIndiceAAutoLlenar = index;
+        modalCargarVehiculoVisible = true;
+    }
+
+    private void CerrarModalCargarVehiculo()
+    {
+        modalCargarVehiculoVisible = false;
+    }
+
+    private void SeleccionarVehiculoGuardado(VehiculoDto veh)
+    {
+        if (vehiculoIndiceAAutoLlenar >= 0 && vehiculoIndiceAAutoLlenar < vehiculos.Count)
+        {
+            var vForm = vehiculos[vehiculoIndiceAAutoLlenar];
+            vForm.Tipo = veh.Tipo;
+            vForm.Marca = veh.Marca;
+            vForm.Modelo = veh.Modelo;
+            vForm.Anio = veh.Anio ?? "";
+            vForm.Color = veh.Color ?? "";
+        }
+        modalCargarVehiculoVisible = false;
+    }
+
+    private void AsegurarFechaValidaInicial()
+    {
+        while (EsDiaTotalmenteBloqueado(fechaSeleccionada) || fechaSeleccionada.Date < DateTime.Today)
+        {
+            fechaSeleccionada = fechaSeleccionada.AddDays(1);
+        }
+        AsegurarHoraValidaParaFecha(fechaSeleccionada);
+    }
+
+    private bool EsHoraBloqueada(DateTime fecha, string horaStr)
+    {
+        if (fecha.Date < DateTime.Today) return true;
+
+        if (DateTime.TryParse(horaStr, out var parsedTime))
+        {
+            var dtSlot = fecha.Date + parsedTime.TimeOfDay;
+            
+            // Si es hoy y la hora ya pasó
+            if (fecha.Date == DateTime.Today && dtSlot <= DateTime.Now) return true;
+
+            // Verificar si ya existe una reserva activa para esa fecha y hora exacta
+            return fechasHorasReservadas.Any(r => r.Date == fecha.Date && r.Hour == dtSlot.Hour && r.Minute == dtSlot.Minute);
+        }
+        return false;
+    }
+
+    private List<BloqueoCalendarioDto> bloqueosCalendario = new();
+
+    private bool EsDiaTotalmenteBloqueado(DateTime fecha)
+    {
+        if (fecha.Date < DateTime.Today) return true;
+
+        // Verificar si la fecha está bloqueada explícitamente en el módulo de administración
+        if (bloqueosCalendario.Any(b => !b.EsRecurrente && b.FechaBloqueada.HasValue && b.FechaBloqueada.Value.Date == fecha.Date))
+            return true;
+
+        // Verificar si el día de la semana está bloqueado de forma recurrente (ej: Domingo = 0)
+        int diaSemana = (int)fecha.DayOfWeek;
+        if (bloqueosCalendario.Any(b => b.EsRecurrente && b.DiaSemana.HasValue && b.DiaSemana.Value == diaSemana))
+            return true;
+
+        // Un día está totalmente bloqueado solo si TODAS las horas disponibles están bloqueadas
+        return horariosDisponibles.All(hora => EsHoraBloqueada(fecha, hora));
+    }
+
+    private void AsegurarHoraValidaParaFecha(DateTime fecha)
+    {
+        var disponible = horariosDisponibles.FirstOrDefault(h => !EsHoraBloqueada(fecha, h));
+        if (disponible != null)
+        {
+            horaSeleccionada = disponible;
+            ActualizarFechaReserva();
+        }
+    }
+
+    private void IrAlPasoDirecto(int paso)
+    {
+        mensajeError = null;
+        if (paso > 1 && !ValidarPaso1())
+        {
+            intentoEnviarPaso1 = true;
+            mensajeError = "Por favor completa la información de Marca y Modelo de cada vehículo antes de avanzar.";
+            return;
+        }
+        if (paso > 2 && !ValidarPaso2())
+        {
+            intentoEnviarPaso2 = true;
+            mensajeError = "Por favor selecciona un paquete de tratamiento para todos los vehículos registrados.";
+            return;
+        }
+
+        IrAlPaso(paso);
+    }
+
+    private void IrAlPaso(int paso)
+    {
+        mensajeError = null;
+        pasoActual = paso;
+        if (pasoActual == 2)
+        {
+            vehiculoActivoIdx = 0;
+        }
+    }
+
+    private bool ValidarPaso1()
+    {
+        return vehiculos.All(v => v.EsValido());
+    }
+
+    private void ValidarYContinuarPaso1()
+    {
+        intentoEnviarPaso1 = true;
+        if (!ValidarPaso1())
+        {
+            mensajeError = "Por favor completa la información obligatoria (Marca y Modelo) de todos los vehículos.";
+            return;
+        }
+
+        mensajeError = null;
+        IrAlPaso(2);
+    }
+
+    private bool ValidarPaso2()
+    {
+        return vehiculos.All(v => v.GrupoSeleccionado != null);
+    }
+
+    private void SiguienteVehiculoOPaso()
+    {
+        var vehiculoActual = vehiculos[Math.Min(vehiculoActivoIdx, vehiculos.Count - 1)];
+        if (vehiculoActual.GrupoSeleccionado == null)
+        {
+            intentoEnviarPaso2 = true;
+            mensajeError = $"Por favor selecciona un paquete de tratamiento para el Vehículo {vehiculoActivoIdx + 1}.";
+            return;
+        }
+
+        mensajeError = null;
+        CambiarVehiculoActivo(vehiculoActivoIdx + 1);
+    }
+
+    private void ValidarYContinuarPaso2()
+    {
+        intentoEnviarPaso2 = true;
+        if (!ValidarPaso2())
+        {
+            var vehiculoIncompletoIdx = vehiculos.FindIndex(v => v.GrupoSeleccionado == null);
+            if (vehiculoIncompletoIdx >= 0)
+            {
+                vehiculoActivoIdx = vehiculoIncompletoIdx;
+            }
+            mensajeError = "Debes seleccionar un paquete de tratamiento para todos los vehículos antes de continuar.";
+            return;
+        }
+
+        mensajeError = null;
+        IrAlPaso(3);
+    }
+
+    private bool EsCorreoValido(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return false;
+        return email.Contains("@") && email.Contains(".");
+    }
+
+    private bool ValidarPaso3()
+    {
+        return !string.IsNullOrWhiteSpace(clienteNombre) &&
+               EsCorreoValido(clienteCorreo) &&
+               !string.IsNullOrWhiteSpace(clienteTelefono) &&
+               fechaReserva > DateTime.Now;
+    }
+
+    private void CambiarVehiculoActivo(int index)
+    {
+        if (index >= 0 && index < vehiculos.Count)
+        {
+            vehiculoActivoIdx = index;
+        }
+    }
+
+    private void AgregarVehiculo()
+    {
+        if (vehiculos.Count < 5)
+        {
+            vehiculos.Add(new VehiculoModel());
+        }
+    }
+
+    private void RemoverVehiculo(int index)
+    {
+        if (vehiculos.Count > 1 && index >= 0 && index < vehiculos.Count)
+        {
+            vehiculos.RemoveAt(index);
+            if (vehiculoActivoIdx >= vehiculos.Count)
+            {
+                vehiculoActivoIdx = vehiculos.Count - 1;
+            }
+        }
+    }
+
+    private void SeleccionarGrupo(VehiculoModel vehiculo, ServiceGroup grupo)
+    {
+        vehiculo.GrupoSeleccionado = grupo;
+        vehiculo.AdicionalesSeleccionados.Clear();
+        mensajeError = null;
+    }
+
+    private void ToggleAdicional(VehiculoModel vehiculo, AdditionalService adicional)
+    {
+        var existente = vehiculo.AdicionalesSeleccionados.FirstOrDefault(a => a.Id == adicional.Id);
+        if (existente != null)
+        {
+            vehiculo.AdicionalesSeleccionados.Remove(existente);
+        }
+        else
+        {
+            vehiculo.AdicionalesSeleccionados.Add(adicional);
+        }
+    }
+
+    private decimal ObtenerCostoEntrega()
+    {
+        var opt = listaOpcionesEntrega.FirstOrDefault(o => o.Nombre.Equals(opcionEntrega, StringComparison.OrdinalIgnoreCase));
+        if (opt != null) return opt.CostoAdicional;
+
+        // Fallback para hardcoded pickup
+        if (opcionEntrega.Equals("PickUp", StringComparison.OrdinalIgnoreCase)) return 500;
+        return 0;
+    }
+
+    private decimal CalcularTotalSinDescuento()
+    {
+        return vehiculos.Sum(v => v.Subtotal) + ObtenerCostoEntrega();
+    }
+
+    private decimal CalcularTotal()
+    {
+        if (usuarioId.HasValue && tieneLavadoGratis)
+        {
+            return 0;
+        }
+        return CalcularTotalSinDescuento();
+    }
+
+    private void MesAnterior()
+    {
+        if (calMes == 1) { calMes = 12; calAnio--; }
+        else calMes--;
+    }
+
+    private void MesSiguiente()
+    {
+        if (calMes == 12) { calMes = 1; calAnio++; }
+        else calMes++;
+    }
+
+    private void SeleccionarFecha(DateTime fecha)
+    {
+        if (EsDiaTotalmenteBloqueado(fecha)) return;
+        fechaSeleccionada = fecha;
+
+        if (EsHoraBloqueada(fechaSeleccionada, horaSeleccionada))
+        {
+            AsegurarHoraValidaParaFecha(fechaSeleccionada);
+        }
+        else
+        {
+            ActualizarFechaReserva();
+        }
+    }
+
+    private void SeleccionarHora(string hora)
+    {
+        horaSeleccionada = hora;
+        ActualizarFechaReserva();
+    }
+
+    private void OnFechaCustomChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var dt))
+        {
+            fechaSeleccionada = dt;
+            ActualizarFechaReserva();
+        }
+    }
+
+    private void ActualizarFechaReserva()
+    {
+        try
+        {
+            var timeSpan = TimeSpan.FromHours(9);
+            if (DateTime.TryParse(horaSeleccionada, out var parsedTime))
+            {
+                timeSpan = parsedTime.TimeOfDay;
+            }
+            fechaReserva = fechaSeleccionada.Date + timeSpan;
+        }
+        catch
+        {
+            fechaReserva = fechaSeleccionada;
+        }
+    }
+
+    private bool guardandoReserva = false;
+
+    private async Task ConfirmarReserva()
+    {
+        ActualizarFechaReserva();
+        intentoEnviarPaso3 = true;
+        if (!ValidarPaso3())
+        {
+            mensajeError = "Por favor completa todos los campos de contacto con datos válidos y selecciona una fecha futura.";
+            return;
+        }
+
+        mensajeError = null;
+        guardandoReserva = true;
+        StateHasChanged();
+
+        // Breve retraso visual para la animación de Carga (Loading Overlay)
+        await Task.Delay(1200);
+
+        var dto = new ReservaDto
+        {
+            UsuarioId = usuarioId,
+            ClienteNombre = clienteNombre,
+            ClienteCorreo = clienteCorreo,
+            ClienteTelefono = clienteTelefono,
+            FechaReserva = fechaReserva,
+            OpcionEntrega = opcionEntrega,
+            MontoTotal = CalcularTotal(),
+            EsLavadoGratis = usuarioId.HasValue && tieneLavadoGratis,
+            Estado = "Pendiente",
+            Detalles = vehiculos.Select(v => new ReservaDetalleDto
+            {
+                TipoVehiculo = v.Tipo,
+                Marca = v.Marca,
+                Modelo = v.Modelo,
+                Anio = v.Anio,
+                Color = v.Color,
+                PaqueteServicio = v.GrupoSeleccionado != null 
+                    ? v.GrupoSeleccionado.Name 
+                    : "Servicio Estándar",
+                Precio = (usuarioId.HasValue && tieneLavadoGratis) ? 0 : v.Subtotal
+            }).ToList()
+        };
+
+        int idGenerado = await BookingService.CrearReservaAsync(dto);
+        guardandoReserva = false;
+
+        if (idGenerado > 0)
+        {
+            reservaConfirmada = true;
+        }
+        else
+        {
+            mensajeError = "Ocurrió un error al procesar tu reserva en la base de datos. Inténtalo de nuevo.";
+        }
+
+        StateHasChanged();
+    }
+
+    private void NuevaReserva()
+    {
+        vehiculos = new() { new VehiculoModel() };
+        clienteNombre = "";
+        clienteCorreo = "";
+        clienteTelefono = "";
+        fechaSeleccionada = DateTime.Today.AddDays(1);
+        horaSeleccionada = "09:30 AM";
+        ActualizarFechaReserva();
+        pasoActual = 1;
+        vehiculoActivoIdx = 0;
+        reservaConfirmada = false;
+        intentoEnviarPaso1 = false;
+        intentoEnviarPaso2 = false;
+        intentoEnviarPaso3 = false;
+        mensajeError = null;
+    }
+}

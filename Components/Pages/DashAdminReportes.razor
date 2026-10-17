@@ -1,0 +1,506 @@
+@page "/dashboard/admin/reportes"
+@layout DashboardLayout
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using BlazorAGS.Models
+@using BlazorAGS.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject BookingService BookingService
+@inject IJSRuntime JS
+
+<PageTitle>Reportes & Analíticas | Administración AGS</PageTitle>
+
+<DashSidebar />
+
+<main class="dash-main text-white">
+
+    <!-- ═══ TOP BAR ════════════════════════════════════════════════════════ -->
+    <div class="dash-topbar mb-3">
+        <div>
+            <h1 class="dash-page-title mb-0 text-white fw-bold">Reportes & Analíticas</h1>
+            <span class="text-gray text-xs">Resumen ejecutivo y financiero simplificado de operaciones</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-danger px-3 py-2 fw-bold text-xs rounded-3"
+                    @onclick="DescargarPdf" disabled="@generandoPdf">
+                @if (generandoPdf)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                    <span>Generando...</span>
+                }
+                else
+                {
+                    <i class="fa-solid fa-file-pdf me-1"></i>
+                    <span>Exportar PDF</span>
+                }
+            </button>
+            <span class="badge bg-danger bg-opacity-10 text-red border border-danger px-3 py-2 text-uppercase fw-bold">
+                <i class="fa-solid fa-chart-line me-1"></i> Admin
+            </span>
+        </div>
+    </div>
+
+    <!-- ═══ FILTRO DE FECHAS SLIM ═══════════════════════════════════════════ -->
+    <div class="rpt-slim-card mb-4">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+            <!-- Atajos de Periodos -->
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="text-gray text-xs font-monospace fw-bold text-uppercase me-2"><i class="fa-solid fa-calendar me-1 text-red"></i>Período:</span>
+                @foreach (var atajo in atajos)
+                {
+                    <button type="button"
+                            class="rpt-btn-pill @(atajoActivo == atajo.Key ? "active" : "")"
+                            @onclick='() => AplicarAtajo(atajo.Key)'>
+                        @atajo.Label
+                    </button>
+                }
+            </div>
+
+            <!-- Rango Personalizado -->
+            <div class="d-flex align-items-center gap-2">
+                <input type="date" class="rpt-input-date" value="@(fechaDesde?.ToString("yyyy-MM-dd") ?? "")" @onchange="OnFechaDesdeChanged" />
+                <span class="text-gray text-xs">a</span>
+                <input type="date" class="rpt-input-date" value="@(fechaHasta?.ToString("yyyy-MM-dd") ?? "")" @onchange="OnFechaHastaChanged" />
+                <button type="button" class="btn btn-sm btn-danger px-3 py-1-5 text-xs fw-bold rounded-2" @onclick="AplicarFiltroFecha">Filtrar</button>
+                @if (fechaDesde.HasValue || fechaHasta.HasValue)
+                {
+                    <button type="button" class="btn btn-sm btn-dark border border-secondary text-gray px-2 py-1-5 text-xs rounded-2" @onclick="LimpiarFiltro"><i class="fa-solid fa-xmark"></i></button>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (cargando)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-danger mb-3" role="status"></div>
+            <p class="text-gray text-xs">Cargando datos...</p>
+        </div>
+    }
+    else
+    {
+        <!-- ═══ 1. CUADROS RESUMEN PRINCIPALES ═════════════════════════════════ -->
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="rpt-clean-kpi">
+                    <span class="rpt-kpi-title">Ingresos Generados</span>
+                    <h2 class="rpt-kpi-number text-success">$@montoTotalIngresos.ToString("N2") DOP</h2>
+                    <span class="rpt-kpi-subtext">Citas Aprobadas y Completadas</span>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="rpt-clean-kpi">
+                    <span class="rpt-kpi-title">Citas Totales</span>
+                    <h2 class="rpt-kpi-number text-white">@totalReservas</h2>
+                    <span class="rpt-kpi-subtext">@periodoDescripcion</span>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="rpt-clean-kpi">
+                    <span class="rpt-kpi-title">Citas Completadas</span>
+                    <h2 class="rpt-kpi-number text-primary">@cantCompletadas</h2>
+                    <span class="rpt-kpi-subtext">Tasa de finalización: @tasaCompletadoStr%</span>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="rpt-clean-kpi">
+                    <span class="rpt-kpi-title">Vehículos Atendidos</span>
+                    <h2 class="rpt-kpi-number text-warning">@totalVehiculos</h2>
+                    <span class="rpt-kpi-subtext">Total servicios ejecutados</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ 2. DESGLOSE DE ESTADO DE DINERO (TABLA LIMPIA) ═════════════════ -->
+        <div class="row g-4 mb-4">
+            <div class="col-lg-6">
+                <div class="rpt-slim-card h-100">
+                    <h3 class="rpt-section-title"><i class="fa-solid fa-wallet text-red me-2"></i>Desglose Financiero por Estado</h3>
+                    <div class="table-responsive mt-3">
+                        <table class="table text-white align-middle mb-0 text-xs border-secondary" style="--bs-table-bg: transparent; --bs-table-color: #fff;">
+                            <thead>
+                                <tr class="text-gray text-uppercase font-monospace border-bottom border-secondary border-opacity-50">
+                                    <th class="py-2 border-0">Estado</th>
+                                    <th class="py-2 border-0 text-center">Citas</th>
+                                    <th class="py-2 border-0 text-end">Monto Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="border-bottom border-secondary border-opacity-25">
+                                    <td class="py-3 border-0">
+                                        <span class="badge bg-warning text-dark px-2 py-1 text-uppercase fw-bold">PENDIENTES</span>
+                                    </td>
+                                    <td class="py-3 border-0 text-center font-monospace fw-bold">@cantPendientes</td>
+                                    <td class="py-3 border-0 text-end font-monospace text-warning fw-bold">$@ingresosPendientes.ToString("N2") DOP</td>
+                                </tr>
+                                <tr class="border-bottom border-secondary border-opacity-25">
+                                    <td class="py-3 border-0">
+                                        <span class="badge bg-success text-white px-2 py-1 text-uppercase fw-bold">APROBADAS</span>
+                                    </td>
+                                    <td class="py-3 border-0 text-center font-monospace fw-bold">@cantAprobadas</td>
+                                    <td class="py-3 border-0 text-end font-monospace text-success fw-bold">$@ingresosAprobadas.ToString("N2") DOP</td>
+                                </tr>
+                                <tr class="border-bottom border-secondary border-opacity-25">
+                                    <td class="py-3 border-0">
+                                        <span class="badge bg-primary text-white px-2 py-1 text-uppercase fw-bold">COMPLETADAS</span>
+                                    </td>
+                                    <td class="py-3 border-0 text-center font-monospace fw-bold">@cantCompletadas</td>
+                                    <td class="py-3 border-0 text-end font-monospace text-primary fw-bold">$@ingresosCompletadas.ToString("N2") DOP</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 border-0">
+                                        <span class="badge bg-danger text-white px-2 py-1 text-uppercase fw-bold">CANCELADAS</span>
+                                    </td>
+                                    <td class="py-3 border-0 text-center font-monospace fw-bold">@cantCanceladas</td>
+                                    <td class="py-3 border-0 text-end font-monospace text-gray">$0.00 DOP</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ 3. SERVICIOS MÁS POPULARES ════════════════════════════════════ -->
+            <div class="col-lg-6">
+                <div class="rpt-slim-card h-100">
+                    <h3 class="rpt-section-title"><i class="fa-solid fa-fire text-red me-2"></i>Servicios Más Populares</h3>
+                    @if (!serviciosPopulares.Any())
+                    {
+                        <p class="text-gray text-xs mt-3">Sin servicios en el período seleccionado.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive mt-3">
+                            <table class="table text-white align-middle mb-0 text-xs border-secondary" style="--bs-table-bg: transparent; --bs-table-color: #fff;">
+                                <thead>
+                                    <tr class="text-gray text-uppercase font-monospace border-bottom border-secondary border-opacity-50">
+                                        <th class="py-2 border-0">Servicio</th>
+                                        <th class="py-2 border-0 text-center">Cantidad</th>
+                                        <th class="py-2 border-0 text-end">% Popularidad</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var s in serviciosPopulares)
+                                    {
+                                        var pct = totalVehiculos == 0 ? 0 : (s.Cantidad * 100) / totalVehiculos;
+                                        <tr class="border-bottom border-secondary border-opacity-25">
+                                            <td class="py-3 border-0 fw-bold text-white">@s.NombreServicio</td>
+                                            <td class="py-3 border-0 text-center font-monospace fw-bold text-red">@s.Cantidad</td>
+                                            <td class="py-3 border-0 text-end font-monospace text-white fw-bold">@pct%</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ 4. ÚLTIMAS 10 RESERVAS ═════════════════════════════════════════ -->
+        <div class="rpt-slim-card mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="rpt-section-title mb-0"><i class="fa-solid fa-list-ol text-red me-2"></i>Últimas 10 Reservas</h3>
+                <a href="/dashboard/admin/reservas" class="btn btn-link text-red text-xs p-0 text-decoration-none fw-bold">Ir a Gestión de Reservas →</a>
+            </div>
+
+            @if (!ultimasReservas.Any())
+            {
+                <p class="text-gray text-xs my-3">No hay reservas registradas en este período.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table text-white align-middle mb-0 text-xs" style="--bs-table-bg: transparent; --bs-table-color: #fff;">
+                        <thead>
+                            <tr class="text-gray text-uppercase font-monospace border-bottom border-secondary border-opacity-50">
+                                <th class="py-2 border-0">#ID</th>
+                                <th class="py-2 border-0">Cliente</th>
+                                <th class="py-2 border-0">Fecha Reserva</th>
+                                <th class="py-2 border-0">Servicio</th>
+                                <th class="py-2 border-0">Estado</th>
+                                <th class="py-2 border-0 text-end">Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var r in ultimasReservas)
+                            {
+                                <tr class="border-bottom border-secondary border-opacity-25">
+                                    <td class="py-3 border-0 text-red font-monospace fw-bold">#@r.Id</td>
+                                    <td class="py-3 border-0 text-white fw-bold">@r.ClienteNombre</td>
+                                    <td class="py-3 border-0 text-gray">@r.FechaReserva.ToString("dd/MM/yyyy hh:mm tt")</td>
+                                    <td class="py-3 border-0 text-gray">@(r.Detalles.FirstOrDefault()?.PaqueteServicio ?? "-")</td>
+                                    <td class="py-3 border-0">
+                                        <span class="badge @GetBadge(r.Estado) px-2 py-1 text-uppercase fw-bold" style="font-size: 0.68rem;">@r.Estado</span>
+                                    </td>
+                                    <td class="py-3 border-0 text-end text-white font-monospace fw-bold">$@r.MontoTotal.ToString("N2") DOP</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+
+</main>
+
+<style>
+    /* Estilos limpios y profesionales (minimalismo informativo) */
+    .rpt-slim-card {
+        background: #0b0c10;
+        border: 1px solid #1c202d;
+        border-radius: 12px;
+        padding: 20px;
+    }
+
+    .rpt-section-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #ffffff;
+        margin: 0;
+    }
+
+    .rpt-clean-kpi {
+        background: #0b0c10;
+        border: 1px solid #1c202d;
+        border-radius: 12px;
+        padding: 20px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .rpt-kpi-title {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #8a94a6;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 6px;
+    }
+
+    .rpt-kpi-number {
+        font-size: 1.6rem;
+        font-weight: 800;
+        margin: 0 0 4px 0;
+        letter-spacing: -0.02em;
+    }
+
+    .rpt-kpi-subtext {
+        font-size: 0.7rem;
+        color: #5c6578;
+    }
+
+    /* Buttons y controles slim */
+    .rpt-btn-pill {
+        background: #12151e;
+        border: 1px solid #232838;
+        color: #8a94a6;
+        padding: 4px 12px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .rpt-btn-pill:hover {
+        color: #fff;
+        border-color: #e60000;
+    }
+    .rpt-btn-pill.active {
+        background: #e60000;
+        border-color: #e60000;
+        color: #ffffff;
+    }
+
+    .rpt-input-date {
+        background: #12151e;
+        border: 1px solid #232838;
+        color: #ffffff;
+        border-radius: 6px;
+        padding: 4px 10px;
+        font-size: 0.75rem;
+        color-scheme: dark;
+        outline: none;
+    }
+    .rpt-input-date:focus {
+        border-color: #e60000;
+    }
+</style>
+
+@code {
+    private bool cargando = true;
+    private bool generandoPdf = false;
+
+    private DateTime? fechaDesde = null;
+    private DateTime? fechaHasta = null;
+    private string atajoActivo = "todos";
+    private string periodoDescripcion = "Todo el período";
+
+    private List<ReservaDto> todasReservas = new();
+    private List<ReservaDto> reservasFiltradas = new();
+
+    private decimal montoTotalIngresos = 0;
+    private decimal ingresosAprobadas = 0;
+    private decimal ingresosCompletadas = 0;
+    private decimal ingresosPendientes = 0;
+    private int totalReservas = 0;
+    private int totalVehiculos = 0;
+    private int cantPendientes = 0;
+    private int cantAprobadas = 0;
+    private int cantCompletadas = 0;
+    private int cantCanceladas = 0;
+    private string tasaCompletadoStr = "0";
+
+    private List<ServicioPopItem> serviciosPopulares = new();
+    private List<ReservaDto> ultimasReservas = new();
+
+    private record AtatjoItem(string Key, string Label);
+    private readonly List<AtatjoItem> atajos = new()
+    {
+        new("todos",     "Todos"),
+        new("hoy",       "Hoy"),
+        new("semana",    "Esta Semana"),
+        new("mes",       "Este Mes"),
+        new("mes_ant",   "Mes Anterior"),
+        new("trimestre", "Trimestre"),
+        new("anio",      "Este Año"),
+    };
+
+    public class ServicioPopItem
+    {
+        public string NombreServicio { get; set; } = "";
+        public int Cantidad { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        cargando = true;
+        todasReservas = await BookingService.ObtenerReservasPorUsuarioAsync(null);
+        AplicarFiltro();
+        cargando = false;
+    }
+
+    private async Task AplicarAtajo(string key)
+    {
+        atajoActivo = key;
+        var hoy = DateTime.Today;
+
+        (fechaDesde, fechaHasta) = key switch
+        {
+            "hoy"       => (hoy, hoy),
+            "semana"    => (hoy.AddDays(-(int)hoy.DayOfWeek + 1), hoy),
+            "mes"       => (new DateTime(hoy.Year, hoy.Month, 1), hoy),
+            "mes_ant"   => (new DateTime(hoy.Year, hoy.Month, 1).AddMonths(-1), new DateTime(hoy.Year, hoy.Month, 1).AddDays(-1)),
+            "trimestre" => (new DateTime(hoy.Year, ((hoy.Month - 1) / 3) * 3 + 1, 1), hoy),
+            "anio"      => (new DateTime(hoy.Year, 1, 1), hoy),
+            _           => ((DateTime?)null, (DateTime?)null)
+        };
+
+        AplicarFiltro();
+        await Task.CompletedTask;
+    }
+
+    private void OnFechaDesdeChanged(ChangeEventArgs e)
+    {
+        atajoActivo = "custom";
+        if (DateTime.TryParse(e.Value?.ToString(), out var d)) fechaDesde = d;
+        else fechaDesde = null;
+    }
+
+    private void OnFechaHastaChanged(ChangeEventArgs e)
+    {
+        atajoActivo = "custom";
+        if (DateTime.TryParse(e.Value?.ToString(), out var d)) fechaHasta = d;
+        else fechaHasta = null;
+    }
+
+    private void AplicarFiltroFecha()
+    {
+        atajoActivo = (fechaDesde.HasValue || fechaHasta.HasValue) ? "custom" : "todos";
+        AplicarFiltro();
+    }
+
+    private void LimpiarFiltro()
+    {
+        fechaDesde = null;
+        fechaHasta = null;
+        atajoActivo = "todos";
+        AplicarFiltro();
+    }
+
+    private void AplicarFiltro()
+    {
+        reservasFiltradas = todasReservas.Where(r =>
+        {
+            if (fechaDesde.HasValue && r.FechaReserva.Date < fechaDesde.Value.Date) return false;
+            if (fechaHasta.HasValue && r.FechaReserva.Date > fechaHasta.Value.Date) return false;
+            return true;
+        }).ToList();
+
+        periodoDescripcion = (fechaDesde, fechaHasta) switch
+        {
+            (null, null) => "Todo el período",
+            ({ } d, null) => $"Desde {d:dd/MM/yyyy}",
+            (null, { } h) => $"Hasta {h:dd/MM/yyyy}",
+            ({ } d, { } h) when d == h => d.ToString("dd/MM/yyyy"),
+            ({ } d, { } h) => $"{d:dd/MM/yyyy} – {h:dd/MM/yyyy}"
+        };
+
+        var detalles = reservasFiltradas.SelectMany(r => r.Detalles).ToList();
+
+        totalReservas = reservasFiltradas.Count;
+        totalVehiculos = detalles.Count;
+
+        montoTotalIngresos  = reservasFiltradas.Where(r => !r.Estado.Contains("Cancelad", StringComparison.OrdinalIgnoreCase)).Sum(r => r.MontoTotal);
+        ingresosAprobadas   = reservasFiltradas.Where(r => r.Estado.Contains("Aprobad",   StringComparison.OrdinalIgnoreCase)).Sum(r => r.MontoTotal);
+        ingresosCompletadas = reservasFiltradas.Where(r => r.Estado.Contains("Completad", StringComparison.OrdinalIgnoreCase)).Sum(r => r.MontoTotal);
+        ingresosPendientes  = reservasFiltradas.Where(r => r.Estado.Equals("Pendiente",  StringComparison.OrdinalIgnoreCase)).Sum(r => r.MontoTotal);
+
+        cantPendientes  = reservasFiltradas.Count(r => r.Estado.Equals("Pendiente",  StringComparison.OrdinalIgnoreCase));
+        cantAprobadas   = reservasFiltradas.Count(r => r.Estado.Contains("Aprobad",  StringComparison.OrdinalIgnoreCase));
+        cantCompletadas = reservasFiltradas.Count(r => r.Estado.Contains("Completad",StringComparison.OrdinalIgnoreCase));
+        cantCanceladas  = reservasFiltradas.Count(r => r.Estado.Contains("Cancelad", StringComparison.OrdinalIgnoreCase));
+
+        tasaCompletadoStr = totalReservas == 0 ? "0" : ((cantCompletadas * 100.0) / totalReservas).ToString("F1");
+
+        serviciosPopulares = detalles
+            .GroupBy(d => d.PaqueteServicio)
+            .Select(g => new ServicioPopItem { NombreServicio = g.Key, Cantidad = g.Count() })
+            .OrderByDescending(x => x.Cantidad)
+            .ToList();
+
+        ultimasReservas = reservasFiltradas
+            .OrderByDescending(r => r.FechaReserva)
+            .Take(10)
+            .ToList();
+    }
+
+    private async Task DescargarPdf()
+    {
+        generandoPdf = true;
+        StateHasChanged();
+        try
+        {
+            var desde = fechaDesde?.ToString("yyyy-MM-dd") ?? "";
+            var hasta = fechaHasta?.ToString("yyyy-MM-dd") ?? "";
+            var url = $"/api/reportes/pdf?desde={desde}&hasta={hasta}";
+            await JS.InvokeVoidAsync("downloadPdfFromPost", url);
+        }
+        finally
+        {
+            generandoPdf = false;
+        }
+    }
+
+    private string GetBadge(string estado) => estado?.ToLower() switch
+    {
+        "pendiente" => "bg-warning text-dark",
+        "aprobado" or "aprobada" => "bg-success text-white",
+        "completado" or "completada" => "bg-primary text-white",
+        "cancelado" or "cancelada" => "bg-danger text-white",
+        _ => "bg-secondary text-white"
+    };
+}

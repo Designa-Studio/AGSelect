@@ -1,0 +1,173 @@
+@page "/"
+
+<PageTitle>AGS Select | Car Wash & Auto Detail Premium</PageTitle>
+
+<!-- ========================================
+     HERO — VIDEO FULLSCREEN
+======================================== -->
+<section class="hero-video-section">
+    <video class="hero-video" autoplay muted loop playsinline>
+        <source src="/video/157_1-video.mp4" type="video/mp4" />
+    </video>
+    <div class="hero-video-overlay"></div>
+
+    <div class="hero-content">
+        <div class="container">
+            <span class="hero-eyebrow">Servicio Completo y Excelente Calidad</span>
+            <h1 class="hero-title">
+                CAR WASH &<br /><span>DETAILING</span>
+            </h1>
+            <div class="d-flex align-items-center gap-3 mt-5">
+                <a href="/reserva" class="btn-ags-red">
+                    <i class="fa-solid fa-calendar-check"></i>
+                    Agendar Cita
+                </a>
+                <a href="#servicios" class="btn-ags-outline">
+                    Ver Servicios
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCROLL INDICATOR -->
+    <div class="hero-scroll">
+        <span>Scroll Down</span>
+        <span class="scroll-line"></span>
+    </div>
+</section>
+
+
+<!-- ========================================
+     SERVICES GRID — 4 IMAGE CARDS
+======================================== -->
+<section id="servicios">
+    <div class="services-grid">
+        <!-- Card 1 -->
+        <div class="service-card">
+            <img src="/images/ppf_protection.jpg" alt="Protection Film" loading="lazy" />
+            <div class="service-card-overlay"></div>
+            <div class="service-card-body">
+                <span class="service-card-name">Protection Film</span>
+                <span class="service-card-sub">Protección de pintura de alto rendimiento</span>
+            </div>
+        </div>
+        <!-- Card 2 -->
+        <div class="service-card">
+            <img src="/images/interior_detail.jpg" alt="Steam Cleaning" loading="lazy" />
+            <div class="service-card-overlay"></div>
+            <div class="service-card-body">
+                <span class="service-card-name">Steam Cleaning</span>
+                <span class="service-card-sub">Limpieza profunda con vapor a presión</span>
+            </div>
+        </div>
+        <!-- Card 3 -->
+        <div class="service-card">
+            <img src="/images/hero_supercar.jpg" alt="Rims & Tires Washing" loading="lazy" />
+            <div class="service-card-overlay"></div>
+            <div class="service-card-body">
+                <span class="service-card-name">Rims & Tires Washing</span>
+                <span class="service-card-sub">Lavado especializado de aros y cauchos</span>
+            </div>
+        </div>
+        <!-- Card 4 -->
+        <div class="service-card">
+            <img src="/images/ceramic_coating.jpg" alt="Ceramic Coating" loading="lazy" />
+            <div class="service-card-overlay"></div>
+            <div class="service-card-body">
+                <span class="service-card-name">Ceramic Coating</span>
+                <span class="service-card-sub">Recubrimiento cerámico de larga duración</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ========================================
+     MARQUEE TICKER — INFINITE SCROLL
+======================================== -->
+<div class="marquee-section">
+    <div class="marquee-track">
+        <!-- duplicate for seamless loop -->
+        @for (int r = 0; r < 2; r++) {
+            <div class="marquee-inner">
+                <span class="marquee-item">Ceramic Coating <i class="fa-solid fa-diamond"></i></span>
+                <span class="marquee-item">Paint Correction <i class="fa-solid fa-diamond"></i></span>
+                <span class="marquee-item">Lavado Premium <i class="fa-solid fa-diamond"></i></span>
+                <span class="marquee-item">Protection Film <i class="fa-solid fa-diamond"></i></span>
+                <span class="marquee-item">Interior Detailing <i class="fa-solid fa-diamond"></i></span>
+                <span class="marquee-item">Meguiar's Certified <i class="fa-solid fa-diamond"></i></span>
+                <span class="marquee-item">Rims & Tires Wash <i class="fa-solid fa-diamond"></i></span>
+                <span class="marquee-item">Steam Cleaning <i class="fa-solid fa-diamond"></i></span>
+            </div>
+        }
+    </div>
+</div>
+
+
+<!-- ========================================
+     STATS BAR
+======================================== -->
+<div class="stats-bar">
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-item">
+                <span class="stat-num">8+</span>
+                <span class="stat-label">Años de experiencia</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <span class="stat-num">2,000+</span>
+                <span class="stat-label">Vehículos tratados</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <span class="stat-num">7</span>
+                <span class="stat-label">Paquetes disponibles</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <span class="stat-num">100%</span>
+                <span class="stat-label">Garantía de calidad</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- ========================================
+     PARTNERS STRIP
+======================================== -->
+<div class="partners-strip">
+    <div class="container">
+        <div class="d-flex align-items-center justify-content-center flex-wrap gap-5">
+            <div class="partner-logo-wrap">
+                <img src="/images/meguiars_logo.jpg" alt="Meguiar's" />
+            </div>
+            <div class="partner-logo-wrap">
+                <img src="/images/madera-drift-logo.png" alt="Madera Drift" />
+            </div>
+            <div class="partner-logo-wrap">
+                <img src="/images/ceramic-auto-logo.png" alt="Ceramic Auto" />
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- ========================================
+     CTA BANNER
+======================================== -->
+<section class="cta-banner">
+    <div class="container">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-4">
+            <div>
+                <span class="section-eyebrow" style="color: rgba(255,255,255,0.65);">Reserva en Línea</span>
+                <h2 class="cta-title" style="max-width: 780px;">¿LISTO PARA DARLE EL MEJOR CUIDADO A TU AUTO?</h2>
+            </div>
+            <a href="/reserva" class="btn-ags-outline flex-shrink-0" style="border-color: rgba(255,255,255,0.5);">
+                <i class="fa-solid fa-calendar-check"></i>
+                Agendar Cita Ahora
+            </a>
+        </div>
+    </div>
+</section>

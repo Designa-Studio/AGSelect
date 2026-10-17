@@ -1,0 +1,289 @@
+@page "/dashboard/membresia"
+@layout DashboardLayout
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using BlazorAGS.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthService AuthService
+
+<PageTitle>Membresía VIP | AGS Select</PageTitle>
+
+<DashSidebar />
+
+<main class="dash-main text-white">
+
+    <!-- TOP BAR -->
+    <div class="dash-topbar mb-4">
+        <div>
+            <h1 class="dash-page-title mb-0 text-white fw-bold">Membresía VIP</h1>
+            <span class="text-gray text-xs">Consulta tu tarjeta digital, acumula lavados y conoce tus beneficios exclusivos</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="dash-badge badge-done py-2 px-3">
+                <i class="fa-solid fa-crown me-1 text-warning"></i> Estado: @Rol
+            </span>
+        </div>
+    </div>
+
+    <div class="row g-4">
+
+        <!-- COLUMNA IZQUIERDA: TARJETA 3D DIGITAL DE MEMBRESÍA -->
+        <div class="col-lg-6 col-xl-5">
+
+            <div class="dash-card h-100 d-flex flex-column justify-content-between" style="background: #0b0c10; border: 1px solid #171a24; border-radius: 16px; padding: 24px;">
+                <div>
+                    <div class="dash-card-header mb-3">
+                        <h2 class="dash-card-title text-white fw-bold fs-5">Tarjeta Digital VIP</h2>
+                        <span class="dash-badge badge-done">
+                            <i class="fa-solid fa-crown me-1"></i> PREMIUM
+                        </span>
+                    </div>
+
+                    <!-- TARJETA 3D TILT -->
+                    <div class="mc-card my-3" @onmousemove="OnMouseMove" @onmouseleave="OnMouseLeave"
+                         style="transform: perspective(900px) rotateX(@(tiltX)deg) rotateY(@(tiltY)deg);">
+
+                        <!-- SHINE LAYER -->
+                        <div class="mc-shine" style="background: radial-gradient(circle at @(shineX)% @(shineY)%, rgba(255,255,255,0.12) 0%, transparent 65%);"></div>
+
+                        <!-- TOP ROW: logo + PREMIUM chip -->
+                        <div class="mc-top-row">
+                            <img src="/images/logo_ags.png" alt="AGS Select" class="mc-logo" />
+                            <div class="mc-chip">
+                                <i class="fa-solid fa-crown"></i>
+                                PREMIUM
+                            </div>
+                        </div>
+
+                        <!-- MEMBER NAME & ID -->
+                        <div class="mc-member-block">
+                            <span class="mc-field-eyebrow">Nombre del Miembro</span>
+                            <span class="mc-member-name">@Nombre</span>
+                            <span class="mc-member-id">AGS-@(DateTime.Now.Year)-@(UsuarioId > 0 ? UsuarioId.ToString("D5") : "00142")</span>
+                        </div>
+
+                        <!-- WASH DOTS ROW -->
+                        <div class="mc-washes-row">
+                            <div class="mc-washes-inner">
+                                <span class="mc-washes-label">Lavados</span>
+                                <div class="mc-dots">
+                                    @for (int i = 1; i <= 7; i++)
+                                    {
+                                        var idx = i;
+                                        var done = idx <= WashesDone;
+                                        <div class="mc-dot @(done ? "mc-dot-done" : "")"
+                                             @onclick="() => ToggleWash(idx)"
+                                             title="Lavado #@idx">
+                                            @if (done) { <i class="fa-solid fa-check"></i> }
+                                        </div>
+                                    }
+                                </div>
+                                <span class="mc-washes-note">
+                                    @if (WashesDone >= 7)
+                                    { <span style="color:#fbbf24;font-weight:800;">¡Elite Wash Gratis Disponible!</span> }
+                                    else
+                                    { @($"{7 - WashesDone} restante(s) para Elite Wash gratis") }
+                                </span>
+                            </div>
+
+                            <!-- QR CODE -->
+                            <div class="mc-qr-wrap">
+                                <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=AGS-SELECT-MEMBER-@(UsuarioId > 0 ? UsuarioId : 142)&bgcolor=000000&color=ffffff&format=png&qzone=1"
+                                     alt="QR Membresía"
+                                     class="mc-qr-img"
+                                     loading="lazy" />
+                                <span class="mc-qr-label">Escanear</span>
+                            </div>
+                        </div>
+
+                        <!-- BOTTOM STRIP -->
+                        <div class="mc-bottom-strip">
+                            <span class="mc-validity">Válida desde @FechaRegistroStr</span>
+                            <span class="mc-brand">Car Wash &amp; Detailing</span>
+                        </div>
+                    </div>
+
+                    <!-- BARRA DE PROGRESO DE LAVADOS -->
+                    <div class="mt-4 px-1">
+                        <div class="d-flex justify-content-between text-xs mb-2">
+                            <span class="text-gray">Progreso para lavado de regalo</span>
+                            <span class="text-white fw-bold">@WashesDone / 7 Lavados</span>
+                        </div>
+                        <div class="mc-progress-bar-wrap">
+                            <div class="mc-progress-bar" style="width: @(WashesDone * 100 / 7)%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-3 bg-dark rounded-3 border border-secondary border-opacity-25 mt-4">
+                    <span class="text-white text-xs fw-bold d-block mb-1">
+                        <i class="fa-solid fa-qrcode text-red me-1"></i> Identificación en Taller
+                    </span>
+                    <span class="text-gray text-xs">Muestra este código QR al entregar tu vehículo en AGS Select para registrar tus lavados y aplicar descuentos VIP al instante.</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- COLUMNA DERECHA: INFORMACIÓN Y BENEFICIOS EXCLUSIVOS -->
+        <div class="col-lg-6 col-xl-7">
+
+            <!-- TARJETA BENEFICIOS -->
+            <div class="dash-card mb-4" style="background: #0b0c10; border: 1px solid #171a24; border-radius: 16px; padding: 24px;">
+                <div class="d-flex align-items-center justify-content-between mb-4 pb-2 border-bottom border-dark">
+                    <h3 class="text-white fw-bold fs-5 mb-0">
+                        <i class="fa-solid fa-gift text-red me-2"></i>Beneficios de tu Membresía VIP
+                    </h3>
+                    <span class="badge bg-danger bg-opacity-10 text-red border border-danger border-opacity-25 px-3 py-1">NIVEL 1</span>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="p-3 bg-dark rounded-3 border border-secondary border-opacity-25 h-100">
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="p-2 rounded bg-danger bg-opacity-10 text-red me-3">
+                                    <i class="fa-solid fa-star fs-5"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-white fw-bold fs-6 mb-0">Lavado #7 Gratis</h4>
+                                    <span class="text-gray text-xs">Premio a tu lealtad</span>
+                                </div>
+                            </div>
+                            <p class="text-gray text-xs mb-0">Acumula 6 servicios de lavado y el séptimo tratamiento **Elite Wash** va por nuestra cuenta totalmente gratis.</p>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="p-3 bg-dark rounded-3 border border-secondary border-opacity-25 h-100">
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="p-2 rounded bg-danger bg-opacity-10 text-red me-3">
+                                    <i class="fa-solid fa-bolt fs-5"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-white fw-bold fs-6 mb-0">Prioridad en Turnos</h4>
+                                    <span class="text-gray text-xs">Citas Fast-Track</span>
+                                </div>
+                            </div>
+                            <p class="text-gray text-xs mb-0">Acceso preferencial en la agenda y atención directa sin filas al llegar a nuestro taller.</p>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="p-3 bg-dark rounded-3 border border-secondary border-opacity-25 h-100">
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="p-2 rounded bg-danger bg-opacity-10 text-red me-3">
+                                    <i class="fa-solid fa-percent fs-5"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-white fw-bold fs-6 mb-0">15% en Detailing</h4>
+                                    <span class="text-gray text-xs">Tratamientos Cerámicos</span>
+                                </div>
+                            </div>
+                            <p class="text-gray text-xs mb-0">Descuento exclusivo en todos los paquetes de Corrección de Pintura y Cerámica M888.</p>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="p-3 bg-dark rounded-3 border border-secondary border-opacity-25 h-100">
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="p-2 rounded bg-danger bg-opacity-10 text-red me-3">
+                                    <i class="fa-solid fa-truck-pickup fs-5"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-white fw-bold fs-6 mb-0">Servicio PickUp VIP</h4>
+                                    <span class="text-gray text-xs">Retiro a domicilio</span>
+                                </div>
+                            </div>
+                            <p class="text-gray text-xs mb-0">Tarifa preferencial en la recogida y entrega de tu automóvil en tu casa u oficina.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- REGISTRO Y DETALLES DEL TITULAR -->
+            <div class="dash-card" style="background: #0b0c10; border: 1px solid #171a24; border-radius: 16px; padding: 24px;">
+                <h3 class="text-white fw-bold fs-5 mb-3">Detalles de la Cuenta</h3>
+                <div class="row g-3 text-xs">
+                    <div class="col-sm-6">
+                        <span class="text-gray d-block">Titular de Membresía:</span>
+                        <strong class="text-white fs-6">@Nombre</strong>
+                    </div>
+                    <div class="col-sm-6">
+                        <span class="text-gray d-block">Correo Asociado:</span>
+                        <strong class="text-white fs-6">@Correo</strong>
+                    </div>
+                    <div class="col-sm-6">
+                        <span class="text-gray d-block">Código Único:</span>
+                        <strong class="text-red fs-6">AGS-@(DateTime.Now.Year)-@(UsuarioId > 0 ? UsuarioId.ToString("D5") : "00142")</strong>
+                    </div>
+                    <div class="col-sm-6">
+                        <span class="text-gray d-block">Miembro Desde:</span>
+                        <strong class="text-white fs-6">@FechaRegistroStr</strong>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+</main>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthStateTask { get; set; }
+
+    private int UsuarioId = 0;
+    private string Nombre = "Carlos Sánchez";
+    private string Correo = "carlos@ejemplo.com";
+    private string Rol = "Cliente VIP";
+    private string FechaRegistroStr = "Enero 2025";
+
+    private int WashesDone = 2;
+    private double tiltX = 0, tiltY = 0, shineX = 50, shineY = 50;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthStateTask == null) return;
+
+        var authState = await AuthStateTask;
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated != true) return;
+
+        var idClaim = user.FindFirst(ClaimTypes.NameIdentifier);
+        if (idClaim != null && int.TryParse(idClaim.Value, out int id))
+        {
+            UsuarioId = id;
+            var dbUser = await AuthService.ObtenerUsuarioPorIdAsync(UsuarioId);
+            if (dbUser != null)
+            {
+                Nombre = dbUser.Nombre;
+                Correo = dbUser.Correo;
+                Rol = dbUser.RolNombre;
+                WashesDone = Math.Min(dbUser.LavadosCompletados, 7);
+                FechaRegistroStr = dbUser.FechaRegistro.ToString("MMMM yyyy", new System.Globalization.CultureInfo("es-ES"));
+            }
+        }
+    }
+
+    private void ToggleWash(int idx)
+    {
+        if (idx == WashesDone + 1) WashesDone++;
+        else if (idx == WashesDone) WashesDone--;
+    }
+
+    private void OnMouseMove(MouseEventArgs e)
+    {
+        double cardW = 380, cardH = 230;
+        tiltY = ((e.OffsetX / cardW) - 0.5) * 10;
+        tiltX = -((e.OffsetY / cardH) - 0.5) * 7;
+        shineX = e.OffsetX / cardW * 100;
+        shineY = e.OffsetY / cardH * 100;
+    }
+
+    private void OnMouseLeave(MouseEventArgs e)
+    {
+        tiltX = 0; tiltY = 0; shineX = 50; shineY = 50;
+    }
+}

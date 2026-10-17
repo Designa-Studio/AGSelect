@@ -1,0 +1,101 @@
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+<!-- DASHBOARD SIDEBAR (componente reutilizable) -->
+<aside class="dash-sidebar">
+    <div class="dash-sidebar-logo">
+        <img src="/images/logo_ags.png" alt="AGS Select" style="height: 36px;" />
+    </div>
+
+    <nav class="dash-nav">
+        <a href="/dashboard"           class="dash-nav-item @IsActive("/dashboard")">
+            <i class="fa-solid fa-gauge-high"></i>
+            <span>Dashboard</span>
+        </a>
+        <a href="/reserva"           class="dash-nav-item @IsActive("/reserva")">
+            <i class="fa-solid fa-calendar-check"></i>
+            <span>Nueva Reserva</span>
+        </a>
+        <a href="/dashboard/reservas"  class="dash-nav-item @IsActive("/dashboard/reservas")">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+            <span>Mis Reservas</span>
+        </a>
+        <a href="/dashboard/vehiculos" class="dash-nav-item @IsActive("/dashboard/vehiculos")">
+            <i class="fa-solid fa-car"></i>
+            <span>Mis Vehículos</span>
+        </a>
+        <a href="/dashboard/membresia" class="dash-nav-item @IsActive("/dashboard/membresia")">
+            <i class="fa-solid fa-crown"></i>
+            <span>Membresía</span>
+        </a>
+        <a href="/dashboard/perfil"    class="dash-nav-item @IsActive("/dashboard/perfil")">
+            <i class="fa-solid fa-user"></i>
+            <span>Mi Perfil</span>
+        </a>
+
+        @if (esAdmin)
+        {
+            <div class="dash-nav-section-title text-uppercase text-gray text-xs fw-bold px-3 mt-4 mb-2" style="letter-spacing: 1.5px; opacity: 0.6;">
+                ADMINISTRACIÓN
+            </div>
+            <a href="/dashboard/admin/reportes" class="dash-nav-item @IsActive("/dashboard/admin/reportes")">
+                <i class="fa-solid fa-chart-line text-red"></i>
+                <span>Reportes</span>
+            </a>
+            <a href="/dashboard/admin/reservas" class="dash-nav-item @IsActive("/dashboard/admin/reservas")">
+                <i class="fa-solid fa-list-check text-red"></i>
+                <span>Gestión Reservas</span>
+            </a>
+            <a href="/dashboard/admin/configuracion" class="dash-nav-item @IsActive("/dashboard/admin/configuracion")">
+                <i class="fa-solid fa-gears text-red"></i>
+                <span>Configuración Taller</span>
+            </a>
+        }
+    </nav>
+
+    <div class="dash-sidebar-footer">
+        <a href="/" class="dash-nav-item">
+            <i class="fa-solid fa-house"></i>
+            <span>Volver al Sitio</span>
+        </a>
+    </div>
+</aside>
+
+@code {
+    [Inject] NavigationManager Nav { get; set; } = default!;
+    [CascadingParameter] private Task<AuthenticationState>? AuthStateTask { get; set; }
+
+    private bool esAdmin = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthStateTask != null)
+        {
+            var authState = await AuthStateTask;
+            var user = authState.User;
+            if (user.Identity != null && user.Identity.IsAuthenticated)
+            {
+                var roleClaim = user.FindFirst(ClaimTypes.Role)?.Value;
+                if (roleClaim != null && roleClaim.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+                {
+                    esAdmin = true;
+                }
+                else
+                {
+                    // Consultar si es Admin por correo como fallback seguro
+                    var emailClaim = user.FindFirst(ClaimTypes.Email)?.Value;
+                    if (emailClaim == "carlos.sanchez.despero@gmail.com")
+                    {
+                        esAdmin = true;
+                    }
+                }
+            }
+        }
+    }
+
+    private string IsActive(string href)
+    {
+        var current = Nav.ToBaseRelativePath(Nav.Uri).TrimEnd('/');
+        var target  = href.TrimStart('/');
+        return current.Equals(target, StringComparison.OrdinalIgnoreCase) ? "active" : "";
+    }
+}

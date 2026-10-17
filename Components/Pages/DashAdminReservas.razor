@@ -1,0 +1,438 @@
+@page "/dashboard/admin/reservas"
+@layout DashboardLayout
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using BlazorAGS.Models
+@using BlazorAGS.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject BookingService BookingService
+@inject NavigationManager Navigation
+
+<PageTitle>Gestión de Reservas | Administración AGS</PageTitle>
+
+<DashSidebar />
+
+<main class="dash-main text-white">
+
+    <!-- TOP BAR -->
+    <div class="dash-topbar mb-4">
+        <div>
+            <h1 class="dash-page-title mb-0 text-white fw-bold">Gestión de Reservas</h1>
+            <span class="text-gray text-xs">Administra las solicitudes de citas, aprueba, completa o cancela reservas</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-danger bg-opacity-10 text-red border border-danger px-3 py-2 text-uppercase fw-bold">
+                <i class="fa-solid fa-user-shield me-1"></i> Panel de Administración
+            </span>
+        </div>
+    </div>
+
+    <!-- FILTROS DE ESTADO -->
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <button type="button" class="btn @(filtroEstado == "Todos" ? "btn-danger" : "btn-dark border-secondary border-opacity-25 text-gray") px-3 py-2 text-xs fw-bold rounded-3" @onclick='() => Filtrar("Todos")'>
+            Todas (@reservasTotales.Count)
+        </button>
+        <button type="button" class="btn @(filtroEstado == "Pendiente" ? "btn-warning text-dark" : "btn-dark border-secondary border-opacity-25 text-gray") px-3 py-2 text-xs fw-bold rounded-3" @onclick='() => Filtrar("Pendiente")'>
+            <i class="fa-solid fa-hourglass-half me-1"></i> Pendientes (@reservasTotales.Count(r => r.Estado.Equals("Pendiente", StringComparison.OrdinalIgnoreCase)))
+        </button>
+        <button type="button" class="btn @(filtroEstado == "Aprobado" ? "btn-success text-white" : "btn-dark border-secondary border-opacity-25 text-gray") px-3 py-2 text-xs fw-bold rounded-3" @onclick='() => Filtrar("Aprobado")'>
+            <i class="fa-solid fa-circle-check me-1"></i> Aprobadas (@reservasTotales.Count(r => r.Estado.Equals("Aprobado", StringComparison.OrdinalIgnoreCase) || r.Estado.Equals("Aprobada", StringComparison.OrdinalIgnoreCase)))
+        </button>
+        <button type="button" class="btn @(filtroEstado == "Completado" ? "btn-primary text-white" : "btn-dark border-secondary border-opacity-25 text-gray") px-3 py-2 text-xs fw-bold rounded-3" @onclick='() => Filtrar("Completado")'>
+            <i class="fa-solid fa-flag-checkered me-1"></i> Completadas (@reservasTotales.Count(r => r.Estado.Equals("Completado", StringComparison.OrdinalIgnoreCase) || r.Estado.Equals("Completada", StringComparison.OrdinalIgnoreCase)))
+        </button>
+        <button type="button" class="btn @(filtroEstado == "Cancelado" ? "btn-outline-danger text-red" : "btn-dark border-secondary border-opacity-25 text-gray") px-3 py-2 text-xs fw-bold rounded-3" @onclick='() => Filtrar("Cancelado")'>
+            <i class="fa-solid fa-circle-xmark me-1"></i> Canceladas (@reservasTotales.Count(r => r.Estado.Equals("Cancelado", StringComparison.OrdinalIgnoreCase) || r.Estado.Equals("Cancelada", StringComparison.OrdinalIgnoreCase)))
+        </button>
+    </div>
+
+    <!-- TABLA DE RESERVAS DEL SISTEMA -->
+    <div class="dash-card" style="background: #0b0c10; border: 1px solid #171a24; border-radius: 16px; padding: 24px;">
+        @if (cargando)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-border text-danger" role="status"></div>
+                <p class="text-gray text-xs mt-2">Cargando reservas del sistema...</p>
+            </div>
+        }
+        else if (!reservasFiltradas.Any())
+        {
+            <div class="text-center py-5">
+                <i class="fa-solid fa-calendar-xmark text-gray display-4 mb-3 opacity-50"></i>
+                <h5 class="text-white fw-bold">No hay reservas en la categoría "@filtroEstado"</h5>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive style-scrollbar" style="overflow-x: auto; overflow-y: visible;">
+                <table class="table text-white align-middle mb-0" style="--bs-table-bg: transparent; --bs-table-color: #fff;">
+                    <thead>
+                        <tr class="text-gray text-xs" style="border-bottom: 1px solid #171a24;">
+                            <th class="py-3 border-0">ID</th>
+                            <th class="py-3 border-0">Cliente</th>
+                            <th class="py-3 border-0">Teléfono</th>
+                            <th class="py-3 border-0">Vehículo(s)</th>
+                            <th class="py-3 border-0">Fecha y hora</th>
+                            <th class="py-3 border-0">Monto</th>
+                            <th class="py-3 border-0">Estado Actual</th>
+                            <th class="py-3 border-0 text-end">Cambiar Estado</th>
+                            <th class="py-3 border-0 text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var res in reservasPaginadas)
+                        {
+                            <tr style="border-bottom: 1px solid #171a24;">
+                                <td class="py-3 border-0">
+                                    <strong class="text-red">#@res.Id</strong>
+                                </td>
+                                <td class="py-3 border-0">
+                                    <span class="text-white fw-bold text-sm">@res.ClienteNombre</span>
+                                </td>
+                                <td class="py-3 border-0">
+                                    <span class="text-gray text-xs">@(string.IsNullOrWhiteSpace(res.ClienteTelefono) ? "N/A" : res.ClienteTelefono)</span>
+                                </td>
+                                <td class="py-3 border-0">
+                                    <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3 py-1 text-xs fw-bold" @onclick="() => AbrirModalVehiculos(res)">
+                                        <i class="fa-solid fa-car me-1"></i>
+                                        @res.Detalles.Count @(res.Detalles.Count == 1 ? "vehículo" : "vehículos")
+                                    </button>
+                                </td>
+                                <td class="py-3 border-0">
+                                    <span class="text-white fw-bold d-block text-xs">@res.FechaReserva.ToString("dd/MM/yyyy")</span>
+                                    <span class="text-red text-xs fw-bold">@res.FechaReserva.ToString("hh:mm tt")</span>
+                                </td>
+                                <td class="py-3 border-0 fw-bold text-white fs-6">
+                                    $@res.MontoTotal.ToString("N2") DOP
+                                </td>
+                                <td class="py-3 border-0">
+                                    <span class="badge @GetBadgeBg(res.Estado) px-3 py-2 text-uppercase fw-bold" style="font-size: 0.72rem;">
+                                        @res.Estado
+                                    </span>
+                                </td>
+                                <td class="py-3 border-0 text-end">
+                                    <select class="form-select form-select-sm d-inline-block text-white text-xs fw-bold rounded-2 px-3 py-1-5"
+                                            style="width: auto; min-width: 150px; background: #11131c; border: 1px solid #2a2d3e; color: #fff; cursor: pointer;"
+                                            value="@GetEstadoNormalizado(res.Estado)"
+                                            @onchange='(e) => EjecutarCambiarEstado(res.Id, e.Value?.ToString() ?? "")'>
+                                        <option value="Pendiente" style="background: #11131c; color: #ffc107;">Pendiente</option>
+                                        <option value="Aprobado" style="background: #11131c; color: #198754;">Aprobar Cita</option>
+                                        <option value="Completado" style="background: #11131c; color: #0d6efd;">Completar Cita</option>
+                                        <option value="Cancelado" style="background: #11131c; color: #dc3545;">Cancelar Cita</option>
+                                    </select>
+                                </td>
+                                <td class="py-3 border-0 text-center">
+                                    <button type="button" class="btn btn-outline-danger btn-sm rounded-2 px-2 py-1" 
+                                            title="Eliminar Reserva" 
+                                            @onclick="() => ConfirmarEliminarReserva(res)">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- CONTROLES DE PAGINACIÓN -->
+            @if (totalPaginas > 1)
+            {
+                <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3 mt-4 pt-3 border-top border-secondary border-opacity-25 text-gray text-xs">
+                    <div>
+                        Mostrando <strong>@((paginaActual - 1) * elementosPorPagina + 1)</strong> a <strong>@(Math.Min(paginaActual * elementosPorPagina, reservasFiltradas.Count))</strong> de <strong>@reservasFiltradas.Count</strong> reservas
+                    </div>
+                    <div class="d-flex align-items-center gap-1">
+                        <button type="button" class="btn btn-dark border-secondary border-opacity-25 text-white btn-sm px-3 rounded-2" 
+                                disabled="@(paginaActual == 1)" 
+                                @onclick="() => CambiarPagina(paginaActual - 1)">
+                            <i class="fa-solid fa-chevron-left me-1"></i> Anterior
+                        </button>
+
+                        @foreach (var pag in GetPaginasIntervalo())
+                        {
+                            if (pag == -1)
+                            {
+                                <span class="px-2 text-gray fw-bold">...</span>
+                            }
+                            else
+                            {
+                                int p = pag;
+                                <button type="button" class="btn btn-sm px-3 rounded-2 @(paginaActual == p ? "btn-danger fw-bold" : "btn-dark border-secondary border-opacity-25 text-gray")"
+                                        @onclick="() => CambiarPagina(p)">
+                                    @p
+                                </button>
+                            }
+                        }
+
+                        <button type="button" class="btn btn-dark border-secondary border-opacity-25 text-white btn-sm px-3 rounded-2" 
+                                disabled="@(paginaActual == totalPaginas)" 
+                                @onclick="() => CambiarPagina(paginaActual + 1)">
+                            Siguiente <i class="fa-solid fa-chevron-right ms-1"></i>
+                        </button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+</main>
+
+<!-- MODAL DE VEHÍCULOS -->
+@if (reservaSeleccionada != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);" @onclick="CerrarModalVehiculos">
+        <div class="modal-dialog modal-dialog-centered" @onclick:stopPropagation="true">
+            <div class="modal-content text-white" style="background: #11131c; border: 1px solid #2a2d3e; border-radius: 16px;">
+                <div class="modal-header border-bottom border-secondary border-opacity-25 py-3">
+                    <h5 class="modal-title fw-bold text-white fs-6">
+                        <i class="fa-solid fa-car text-red me-2"></i>Vehículos de Reserva #@reservaSeleccionada.Id
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CerrarModalVehiculos"></button>
+                </div>
+                <div class="modal-body py-4">
+                    <div class="mb-3 text-xs text-gray">
+                        <strong class="text-white">Cliente:</strong> @reservaSeleccionada.ClienteNombre <br />
+                        <strong class="text-white">Teléfono:</strong> @(string.IsNullOrWhiteSpace(reservaSeleccionada.ClienteTelefono) ? "N/A" : reservaSeleccionada.ClienteTelefono)
+                    </div>
+                    <div class="d-flex flex-column gap-3">
+                        @foreach (var det in reservaSeleccionada.Detalles)
+                        {
+                            <div class="p-3 rounded-3" style="background: #0b0c10; border: 1px solid #171a24;">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="text-white fw-bold text-sm">
+                                        <i class="fa-solid fa-car text-red me-2"></i>@det.Marca @det.Modelo
+                                    </span>
+                                    <span class="badge bg-secondary bg-opacity-25 text-gray px-2 py-1 text-xs">
+                                        @det.TipoVehiculo
+                                    </span>
+                                </div>
+                                <div class="text-gray text-xs ms-4">
+                                    <i class="fa-solid fa-screwdriver-wrench me-1 text-red"></i> <strong>Servicio:</strong> @det.PaqueteServicio
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-secondary border-opacity-25 py-2">
+                    <button type="button" class="btn btn-secondary text-xs fw-bold px-4 py-2 rounded-3" @onclick="CerrarModalVehiculos">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- MODAL DE CONFIRMACIÓN DE ELIMINACIÓN -->
+@if (reservaAEliminar != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.75); backdrop-filter: blur(4px);" @onclick="CancelarEliminarReserva">
+        <div class="modal-dialog modal-dialog-centered" @onclick:stopPropagation="true">
+            <div class="modal-content text-white" style="background: #11131c; border: 1px solid #dc3545; border-radius: 16px;">
+                <div class="modal-header border-bottom border-secondary border-opacity-25 py-3">
+                    <h5 class="modal-title fw-bold text-danger fs-6">
+                        <i class="fa-solid fa-triangle-exclamation me-2"></i>Confirmar Eliminación de Reserva
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CancelarEliminarReserva"></button>
+                </div>
+                <div class="modal-body py-4">
+                    <p class="text-white text-sm mb-2">
+                        ¿Estás seguro de que deseas eliminar permanentemente la reserva <strong class="text-red">#@reservaAEliminar.Id</strong> del cliente <strong class="text-white">@reservaAEliminar.ClienteNombre</strong>?
+                    </p>
+                    <div class="p-3 rounded-3 bg-dark border border-secondary border-opacity-25 text-xs text-gray">
+                        <i class="fa-solid fa-circle-info text-warning me-1"></i> Esta acción no se puede deshacer y borrará la reserva y sus detalles de la base de datos.
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-secondary border-opacity-25 py-2">
+                    <button type="button" class="btn btn-secondary text-xs fw-bold px-3 py-2 rounded-3" @onclick="CancelarEliminarReserva">Cancelar</button>
+                    <button type="button" class="btn btn-danger text-xs fw-bold px-4 py-2 rounded-3" @onclick="EjecutarEliminarReserva">
+                        <i class="fa-solid fa-trash-can me-1"></i> Sí, Eliminar Reserva
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthStateTask { get; set; }
+
+    private bool cargando = true;
+    private string filtroEstado = "Todos";
+
+    private List<ReservaDto> reservasTotales = new();
+    private List<ReservaDto> reservasFiltradas = new();
+
+    // Paginación
+    private int paginaActual = 1;
+    private int elementosPorPagina = 5;
+    private int totalPaginas => (int)Math.Ceiling((double)reservasFiltradas.Count / elementosPorPagina);
+
+    private IEnumerable<ReservaDto> reservasPaginadas => reservasFiltradas
+        .Skip((paginaActual - 1) * elementosPorPagina)
+        .Take(elementosPorPagina);
+
+    // Modal Vehículos
+    private ReservaDto? reservaSeleccionada = null;
+
+    // Modal Eliminar Reserva
+    private ReservaDto? reservaAEliminar = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        cargando = true;
+        await CargarReservas();
+        cargando = false;
+    }
+
+    private async Task CargarReservas()
+    {
+        // Al pasar null, obtiene TODAS las reservas del sistema para administradores
+        reservasTotales = await BookingService.ObtenerReservasPorUsuarioAsync(null);
+        AplicarFiltro();
+    }
+
+    private void Filtrar(string estado)
+    {
+        filtroEstado = estado;
+        paginaActual = 1;
+        AplicarFiltro();
+    }
+
+    private void AplicarFiltro()
+    {
+        if (filtroEstado == "Todos")
+        {
+            reservasFiltradas = reservasTotales;
+        }
+        else if (filtroEstado == "Aprobado")
+        {
+            reservasFiltradas = reservasTotales
+                .Where(r => r.Estado.Equals("Aprobado", StringComparison.OrdinalIgnoreCase) || r.Estado.Equals("Aprobada", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+        else if (filtroEstado == "Completado")
+        {
+            reservasFiltradas = reservasTotales
+                .Where(r => r.Estado.Equals("Completado", StringComparison.OrdinalIgnoreCase) || r.Estado.Equals("Completada", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+        else if (filtroEstado == "Cancelado")
+        {
+            reservasFiltradas = reservasTotales
+                .Where(r => r.Estado.Equals("Cancelado", StringComparison.OrdinalIgnoreCase) || r.Estado.Equals("Cancelada", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+        else
+        {
+            reservasFiltradas = reservasTotales
+                .Where(r => r.Estado.Equals(filtroEstado, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        if (paginaActual > totalPaginas && totalPaginas > 0)
+        {
+            paginaActual = totalPaginas;
+        }
+    }
+
+    private void CambiarPagina(int nuevaPagina)
+    {
+        if (nuevaPagina >= 1 && nuevaPagina <= totalPaginas)
+        {
+            paginaActual = nuevaPagina;
+        }
+    }
+
+    private IEnumerable<int> GetPaginasIntervalo()
+    {
+        var paginas = new List<int>();
+        if (totalPaginas <= 7)
+        {
+            for (int i = 1; i <= totalPaginas; i++) paginas.Add(i);
+        }
+        else
+        {
+            paginas.Add(1);
+
+            int inicio = Math.Max(2, paginaActual - 1);
+            int fin = Math.Min(totalPaginas - 1, paginaActual + 1);
+
+            if (inicio > 2)
+            {
+                paginas.Add(-1); // Representa los elipsis "..."
+            }
+
+            for (int i = inicio; i <= fin; i++)
+            {
+                paginas.Add(i);
+            }
+
+            if (fin < totalPaginas - 1)
+            {
+                paginas.Add(-1); // Representa los elipsis "..."
+            }
+
+            paginas.Add(totalPaginas);
+        }
+        return paginas;
+    }
+
+    private void AbrirModalVehiculos(ReservaDto reserva)
+    {
+        reservaSeleccionada = reserva;
+    }
+
+    private void CerrarModalVehiculos()
+    {
+        reservaSeleccionada = null;
+    }
+
+    private void ConfirmarEliminarReserva(ReservaDto reserva)
+    {
+        reservaAEliminar = reserva;
+    }
+
+    private void CancelarEliminarReserva()
+    {
+        reservaAEliminar = null;
+    }
+
+    private async Task EjecutarEliminarReserva()
+    {
+        if (reservaAEliminar == null) return;
+        int id = reservaAEliminar.Id;
+        bool ok = await BookingService.EliminarReservaAsync(id);
+        reservaAEliminar = null;
+        if (ok)
+        {
+            await CargarReservas();
+        }
+    }
+
+    private async Task EjecutarCambiarEstado(int reservaId, string nuevoEstado)
+    {
+        if (string.IsNullOrEmpty(nuevoEstado)) return;
+        bool ok = await BookingService.ActualizarEstadoReservaAsync(reservaId, nuevoEstado);
+        if (ok)
+        {
+            await CargarReservas();
+        }
+    }
+
+    private string GetEstadoNormalizado(string estado) => estado?.ToLower() switch
+    {
+        "aprobado" or "aprobada" => "Aprobado",
+        "completado" or "completada" => "Completado",
+        "cancelado" or "cancelada" => "Cancelado",
+        _ => "Pendiente"
+    };
+
+    private string GetBadgeBg(string estado) => estado?.ToLower() switch
+    {
+        "pendiente" => "bg-warning text-dark",
+        "aprobado" or "aprobada" => "bg-success text-white",
+        "completado" or "completada" => "bg-primary text-white",
+        "cancelado" or "cancelada" => "bg-danger text-white",
+        _ => "bg-secondary text-white"
+    };
+}

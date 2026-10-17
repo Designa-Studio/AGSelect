@@ -1,0 +1,303 @@
+@page "/dashboard/perfil"
+@layout DashboardLayout
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using BlazorAGS.Models
+@using BlazorAGS.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthService AuthService
+@inject CustomAuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+<PageTitle>Mi Perfil | AGS Select</PageTitle>
+
+<DashSidebar />
+
+<main class="dash-main text-white">
+
+    <!-- TOP BAR -->
+    <div class="dash-topbar">
+        <div>
+            <h1 class="dash-page-title">Mi Perfil</h1>
+            <span class="text-gray text-xs">Gestiona tu cuenta y tarjeta de membresía</span>
+        </div>
+        <button class="btn-ags-red" @onclick="PedirConfirmacionLogout">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            Cerrar Sesión
+        </button>
+    </div>
+
+    <div class="row g-4">
+
+        <!-- ============================
+             COL IZQUIERDA: AVATAR DE USUARIO
+        ============================= -->
+        <div class="col-lg-4">
+
+            <!-- AVATAR CARD -->
+            <div class="dash-card text-center mb-4" style="background: #0b0c10; border: 1px solid #171a24; border-radius: 16px; padding: 24px;">
+                <div class="dash-profile-avatar mx-auto mb-3" style="width:80px;height:80px;font-size:2rem;">
+                    @Inicial
+                </div>
+                <h3 class="fw-bold mb-1" style="font-size:1.1rem;">@Nombre</h3>
+                <p class="text-gray text-xs mb-1">@Correo</p>
+                <p class="text-gray text-xs mb-3">
+                    <i class="fa-solid fa-phone text-red me-1"></i>
+                    @(string.IsNullOrEmpty(Telefono) ? "Sin teléfono registrado" : Telefono)
+                </p>
+                <div class="d-flex gap-2 justify-content-center">
+                    <span class="dash-badge badge-done">
+                        <i class="fa-solid fa-shield-halved me-1"></i> Cuenta Verificada
+                    </span>
+                    <span class="dash-badge badge-pending">@Rol</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ============================
+             COL DERECHA: FORMULARIO DE PERFIL
+        ============================= -->
+        <div class="col-lg-8">
+
+            <!-- ALERTAS -->
+            @if (!string.IsNullOrEmpty(ErrorMsg))
+            {
+                <div class="auth-error-msg mb-4">
+                    <i class="fa-solid fa-circle-exclamation me-2"></i>@ErrorMsg
+                </div>
+            }
+
+            @if (ShowSuccessMsg)
+            {
+                <div class="auth-error-msg mb-4" style="background:rgba(34,197,94,0.08);border-color:rgba(34,197,94,0.3);color:#4ade80;">
+                    <i class="fa-solid fa-circle-check me-2"></i> Perfil actualizado correctamente.
+                </div>
+            }
+
+            <!-- DATOS PERSONALES -->
+            <div class="dash-card mb-4">
+                <div class="dash-card-header">
+                    <h2 class="dash-card-title">Datos Personales</h2>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="ags-form-label">Nombre Completo</label>
+                        <input type="text" class="ags-form-input" @bind="Nombre" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="ags-form-label">Correo Electrónico</label>
+                        <input type="email" class="ags-form-input" value="@Correo" readonly disabled style="opacity:0.5;" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="ags-form-label">Teléfono / WhatsApp</label>
+                        <input type="tel" class="ags-form-input" placeholder="(809) 000-0000" @bind="Telefono" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="ags-form-label">Rol Asignado</label>
+                        <input type="text" class="ags-form-input" value="@Rol" readonly disabled style="opacity:0.5;" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="ags-form-label">Miembro Desde</label>
+                        <input type="text" class="ags-form-input" value="@FechaRegistroStr" readonly disabled style="opacity:0.5;" />
+                    </div>
+                </div>
+
+                <div class="text-end">
+                    <button class="btn-ags-red" @onclick="GuardarCambios" disabled="@Cargando">
+                        @if (Cargando)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <span>Guardando...</span>
+                        }
+                        else
+                        {
+                            <i class="fa-solid fa-floppy-disk"></i>
+                            <span>Guardar Cambios</span>
+                        }
+                    </button>
+                </div>
+            </div>
+
+            <!-- CAMBIAR CONTRASEÑA -->
+            <div class="dash-card">
+                <div class="dash-card-header" style="cursor:pointer;" @onclick="TogglePassword">
+                    <h2 class="dash-card-title">Cambiar Contraseña</h2>
+                    <i class="fa-solid @(ShowPasswordFields ? "fa-chevron-up" : "fa-chevron-down") text-gray"></i>
+                </div>
+
+                @if (ShowPasswordFields)
+                {
+                    <div class="row g-3 mt-1">
+                        <div class="col-12">
+                            <label class="ags-form-label">Contraseña Actual</label>
+                            <input type="password" class="ags-form-input" placeholder="••••••••" @bind="PassActual" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="ags-form-label">Nueva Contraseña</label>
+                            <input type="password" class="ags-form-input" placeholder="Mínimo 6 caracteres" @bind="PassNueva" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="ags-form-label">Confirmar Nueva Contraseña</label>
+                            <input type="password" class="ags-form-input" placeholder="Repite la contraseña" @bind="PassConfirmar" />
+                        </div>
+                        <div class="col-12 text-end">
+                            <button class="btn-ags-outline">
+                                <i class="fa-solid fa-lock"></i>
+                                Actualizar Contraseña
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+
+        </div>
+    </div>
+
+</main>
+
+<!-- MODAL CONFIRMACIÓN CERRAR SESIÓN -->
+@if (ConfirmarLogoutVisible)
+{
+    <div class="auth-overlay" @onclick="CancelarLogout">
+        <div class="auth-modal text-center p-4" style="max-width: 400px;" @onclick:stopPropagation="true">
+            <div class="mb-3">
+                <div class="d-inline-flex align-items-center justify-content-center bg-danger bg-opacity-10 text-red rounded-circle p-3 mb-2" style="width: 60px; height: 60px;">
+                    <i class="fa-solid fa-right-from-bracket fs-3"></i>
+                </div>
+                <h5 class="text-white fw-bold mb-1">¿Cerrar Sesión?</h5>
+                <p class="text-gray text-xs mb-0">¿Estás seguro de que deseas salir de tu cuenta de AGS Select?</p>
+            </div>
+            <div class="d-flex gap-2 justify-content-center mt-4">
+                <button type="button" class="btn btn-outline-secondary text-white w-50 py-2 text-xs rounded-3" @onclick="CancelarLogout">
+                    Cancelar
+                </button>
+                <button type="button" class="btn btn-danger w-50 py-2 text-xs fw-bold rounded-3" @onclick="ConfirmarCerrarSesion">
+                    <i class="fa-solid fa-check me-1"></i> Sí, Salir
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthStateTask { get; set; }
+
+    private int    UsuarioId        = 0;
+    private string Nombre           = "";
+    private string Correo           = "";
+    private string Telefono         = "";
+    private string Rol              = "";
+    private string Inicial          = "U";
+    private string FechaRegistroStr = "";
+
+    private bool   ShowPasswordFields    = false;
+    private bool   ShowSuccessMsg        = false;
+    private bool   Cargando             = false;
+    private bool   ConfirmarLogoutVisible = false;
+    private string ErrorMsg = "";
+
+    private string PassActual    = "";
+    private string PassNueva     = "";
+    private string PassConfirmar = "";
+
+    // Membership card
+    private int WashesDone = 2;
+    private double tiltX = 0, tiltY = 0, shineX = 50, shineY = 50;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthStateTask == null) return;
+
+        var authState = await AuthStateTask;
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated != true) return;
+
+        var idClaim = user.FindFirst(ClaimTypes.NameIdentifier);
+        if (idClaim != null && int.TryParse(idClaim.Value, out int id))
+        {
+            UsuarioId = id;
+            var dbUser = await AuthService.ObtenerUsuarioPorIdAsync(UsuarioId);
+            if (dbUser != null)
+            {
+                Nombre  = dbUser.Nombre;
+                Correo  = dbUser.Correo;
+                Telefono = dbUser.Telefono ?? "";
+                Rol     = dbUser.RolNombre;
+                Inicial = Nombre.Length > 0 ? Nombre[0].ToString().ToUpper() : "U";
+                FechaRegistroStr = dbUser.FechaRegistro.ToString("MMMM yyyy", new System.Globalization.CultureInfo("es-ES"));
+            }
+            else
+            {
+                Nombre  = user.Identity?.Name ?? "";
+                Correo  = user.FindFirst(ClaimTypes.Email)?.Value ?? "";
+                Rol     = user.FindFirst(ClaimTypes.Role)?.Value ?? "Cliente";
+                Inicial = Nombre.Length > 0 ? Nombre[0].ToString().ToUpper() : "U";
+                FechaRegistroStr = DateTime.Now.ToString("MMMM yyyy", new System.Globalization.CultureInfo("es-ES"));
+            }
+        }
+    }
+
+    private async Task GuardarCambios()
+    {
+        ErrorMsg = "";
+        ShowSuccessMsg = false;
+
+        if (string.IsNullOrWhiteSpace(Nombre))
+        {
+            ErrorMsg = "El nombre no puede estar vacío.";
+            return;
+        }
+
+        Cargando = true;
+        StateHasChanged();
+
+        var res = await AuthService.ActualizarPerfilAsync(UsuarioId, Nombre, Telefono);
+        Cargando = false;
+
+        if (res.Exito)
+        {
+            ShowSuccessMsg = true;
+            Inicial = Nombre.Length > 0 ? Nombre[0].ToString().ToUpper() : "U";
+            await Task.Delay(3000);
+            ShowSuccessMsg = false;
+            StateHasChanged();
+        }
+        else
+        {
+            ErrorMsg = res.Mensaje;
+        }
+    }
+
+    private void TogglePassword() => ShowPasswordFields = !ShowPasswordFields;
+
+    private void ToggleWash(int idx)
+    {
+        if (idx == WashesDone + 1) WashesDone++;
+        else if (idx == WashesDone) WashesDone--;
+    }
+
+    private void OnMouseMove(MouseEventArgs e)
+    {
+        double cardW = 380, cardH = 230;
+        tiltY  =  ((e.OffsetX / cardW) - 0.5) * 10;
+        tiltX  = -((e.OffsetY / cardH) - 0.5) * 7;
+        shineX = e.OffsetX / cardW * 100;
+        shineY = e.OffsetY / cardH * 100;
+    }
+
+    private void OnMouseLeave(MouseEventArgs e) { tiltX = 0; tiltY = 0; shineX = 50; shineY = 50; }
+
+    private void PedirConfirmacionLogout() => ConfirmarLogoutVisible = true;
+    private void CancelarLogout()          => ConfirmarLogoutVisible = false;
+
+    private async Task ConfirmarCerrarSesion()
+    {
+        ConfirmarLogoutVisible = false;
+        await AuthStateProvider.MarkUserAsLoggedOut();
+        Navigation.NavigateTo("/");
+    }
+}

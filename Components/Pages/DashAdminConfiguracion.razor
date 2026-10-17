@@ -1,0 +1,755 @@
+@page "/dashboard/admin/configuracion"
+@layout DashboardLayout
+@rendermode InteractiveServer
+@using BlazorAGS.Models
+@using BlazorAGS.Services
+@inject BookingService BookingService
+
+<PageTitle>Configuración del Taller | Administración AGS</PageTitle>
+
+<DashSidebar />
+
+<main class="dash-main text-white">
+
+    <!-- TOP BAR -->
+    <div class="dash-topbar mb-4">
+        <div>
+            <h1 class="dash-page-title mb-0 text-white fw-bold">Configuración del Taller</h1>
+            <span class="text-gray text-xs">Administra categorías de vehículos, catálogo de servicios, días bloqueados y opciones de entrega</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-danger bg-opacity-10 text-red border border-danger px-3 py-2 text-uppercase fw-bold">
+                <i class="fa-solid fa-gears me-1"></i> Admin Backoffice
+            </span>
+        </div>
+    </div>
+
+    <!-- PESTAÑAS NAVEGABLES (TABS) -->
+    <div class="d-flex border-bottom border-secondary border-opacity-25 mb-4 gap-2 flex-wrap">
+        <button type="button" class="btn rpt-tab-btn @(tabActiva == "categorias" ? "active" : "")" @onclick='() => CambiarTab("categorias")'>
+            <i class="fa-solid fa-car me-2"></i>Categorías de Vehículos (@categorias.Count)
+        </button>
+        <button type="button" class="btn rpt-tab-btn @(tabActiva == "servicios" ? "active" : "")" @onclick='() => CambiarTab("servicios")'>
+            <i class="fa-solid fa-spray-can-sparkles me-2"></i>Servicios / Tratamientos (@servicios.Count)
+        </button>
+        <button type="button" class="btn rpt-tab-btn @(tabActiva == "entrega" ? "active" : "")" @onclick='() => CambiarTab("entrega")'>
+            <i class="fa-solid fa-truck-ramp-box me-2"></i>Opciones de Entrega (@opcionesEntrega.Count)
+        </button>
+        <button type="button" class="btn rpt-tab-btn @(tabActiva == "calendario" ? "active" : "")" @onclick='() => CambiarTab("calendario")'>
+            <i class="fa-solid fa-calendar-xmark me-2"></i>Bloqueos de Calendario (@bloqueos.Count)
+        </button>
+    </div>
+
+    @if (cargando)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-danger mb-3" role="status"></div>
+            <p class="text-gray text-xs">Cargando configuración...</p>
+        </div>
+    }
+    else
+    {
+        <!-- ═══ TAB 1: CATEGORÍAS DE VEHÍCULOS ═════════════════════════════════ -->
+        @if (tabActiva == "categorias")
+        {
+            <div class="row g-4">
+                <!-- FORMULARIO AGREGAR NUEVA CATEGORÍA DE VEHÍCULO -->
+                <div class="col-lg-4">
+                    <div class="cfg-card h-100">
+                        <h4 class="text-white fw-bold mb-3 fs-5">
+                            <i class="fa-solid fa-plus text-red me-2"></i>Nueva Categoría de Vehículo
+                        </h4>
+                        <div class="mb-3">
+                            <label class="form-label text-xs text-gray fw-bold text-uppercase">Nombre de la Categoría *</label>
+                            <input type="text" class="form-control bg-dark text-white text-xs border-secondary"
+                                   placeholder="Ej: Cuatrimoto (ATV) / Buggy / Camión Tres Ejes"
+                                   @bind="nuevaCategoriaNombre" />
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label text-xs text-gray fw-bold text-uppercase">Código Único Sistema *</label>
+                            <input type="text" class="form-control bg-dark text-white text-xs border-secondary font-monospace"
+                                   placeholder="Ej: Cuatrimoto (sin espacios ni acentos)"
+                                   @bind="nuevaCategoriaCodigo" />
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(mensajeCategoria))
+                        {
+                            <div class="alert alert-info text-xs py-2 mb-3">@mensajeCategoria</div>
+                        }
+
+                        <button type="button" class="btn btn-danger w-100 py-2 text-xs fw-bold rounded-3" @onclick="GuardarNuevaCategoria">
+                            <i class="fa-solid fa-floppy-disk me-1"></i> Guardar Categoría
+                        </button>
+                    </div>
+                </div>
+
+                <!-- LISTA DE CATEGORÍAS REGISTRADAS -->
+                <div class="col-lg-8">
+                    <div class="cfg-card h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h4 class="text-white fw-bold mb-1 fs-5">Categorías Registradas</h4>
+                                <span class="text-gray text-xs">Estas categorías están disponibles al registrar vehículos y calcular servicios</span>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                                <table class="table text-white align-middle mb-0 text-xs" style="--bs-table-bg: transparent; --bs-table-color: #fff;">
+                                    <thead>
+                                        <tr class="text-gray text-uppercase font-monospace border-bottom border-secondary border-opacity-50">
+                                            <th class="py-2 border-0">#ID</th>
+                                            <th class="py-2 border-0">Categoría / Tipo</th>
+                                            <th class="py-2 border-0">Código Sistema</th>
+                                            <th class="py-2 border-0 text-center">Estado</th>
+                                            <th class="py-2 border-0 text-end">Acción</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var c in categorias)
+                                        {
+                                            <tr class="border-bottom border-secondary border-opacity-25">
+                                                <td class="py-3 border-0 text-red font-monospace fw-bold">#@c.Id</td>
+                                                <td class="py-3 border-0 text-white fw-bold">
+                                                    <i class="fa-solid fa-car me-2 text-red"></i>@c.Nombre
+                                                </td>
+                                                <td class="py-3 border-0 text-gray font-monospace">@c.Codigo</td>
+                                                <td class="py-3 border-0 text-center">
+                                                    <span class="badge bg-success text-white px-2 py-1">ACTIVA</span>
+                                                </td>
+                                                <td class="py-3 border-0 text-end">
+                                                    <button type="button" class="btn btn-sm btn-outline-danger px-2 py-1 text-xs" title="Eliminar Categoría" @onclick="() => EliminarCategoria(c.Id)">
+                                                        <i class="fa-solid fa-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- ═══ TAB 2: SERVICIOS Y PRECIOS POR VEHÍCULO ═══════════════════════ -->
+        @if (tabActiva == "servicios")
+        {
+            <div class="row g-4 mb-4">
+                <!-- FORMULARIO NUEVO SERVICIO -->
+                <div class="col-lg-4">
+                    <div class="cfg-card">
+                        <h4 class="text-white fw-bold mb-3 fs-5">
+                            <i class="fa-solid fa-plus text-red me-2"></i>Nuevo Servicio / Tratamiento
+                        </h4>
+                        <div class="mb-3">
+                            <label class="form-label text-xs text-gray fw-bold text-uppercase">Nombre del Servicio *</label>
+                            <input type="text" class="form-control bg-dark text-white text-xs border-secondary"
+                                   placeholder="Ej: 6. Restauración de Faros & Cristales"
+                                   @bind="nuevoServicioNombre" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-xs text-gray fw-bold text-uppercase">Descripción / Lo que incluye</label>
+                            <textarea class="form-control bg-dark text-white text-xs border-secondary" rows="2"
+                                      placeholder="Ej: Pulido óptico, desmanchado y sellado cerámico"
+                                      @bind="nuevoServicioDesc"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-xs text-gray fw-bold text-uppercase">Precio Base Automóvil (Car) DOP</label>
+                            <input type="number" step="100" class="form-control bg-dark text-white text-xs border-secondary"
+                                   @bind="nuevoServicioPrecioCar" />
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label text-xs text-gray fw-bold text-uppercase">Precio Base SUV / Jeepeta DOP</label>
+                            <input type="number" step="100" class="form-control bg-dark text-white text-xs border-secondary"
+                                   @bind="nuevoServicioPrecioSuv" />
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(mensajeServicio))
+                        {
+                            <div class="alert alert-info text-xs py-2 mb-3">@mensajeServicio</div>
+                        }
+
+                        <button type="button" class="btn btn-danger w-100 py-2 text-xs fw-bold rounded-3" @onclick="GuardarNuevoServicio">
+                            <i class="fa-solid fa-floppy-disk me-1"></i> Registrar Servicio
+                        </button>
+                    </div>
+                </div>
+
+                <!-- CATÁLOGO EDITABLE DE SERVICIOS Y PRECIOS POR VEHÍCULO -->
+                <div class="col-lg-8">
+                    <div class="cfg-card">
+                        <h4 class="text-white fw-bold mb-1 fs-5">Catálogo de Servicios y Precios por Categoría</h4>
+                        <p class="text-gray text-xs mb-3">Si colocas <strong>$0.00 DOP</strong> en una categoría, el servicio figurará como NO disponible para dicho tipo de vehículo.</p>
+
+                        <div class="d-flex flex-column gap-3">
+                            @foreach (var s in servicios)
+                            {
+                                <div class="p-3 rounded-3 border border-secondary border-opacity-25" style="background: #11131c;">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="text-white fw-bold fs-6"><i class="fa-solid fa-spray-can-sparkles text-red me-2"></i>@s.Name</span>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="badge bg-primary text-white">#@s.Id</span>
+                                            <button type="button" class="btn btn-sm btn-outline-danger px-2 py-0 text-xs" title="Eliminar Servicio" @onclick="() => EliminarServicio(s.Id)">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p class="text-gray text-xs mb-3">@s.Description</p>
+
+                                    <!-- GRID EDITABLE DE PRECIOS POR VEHÍCULO -->
+                                    <div class="row g-2">
+                                        <div class="col-6 col-sm-4 col-md-3">
+                                            <label class="text-gray text-xs d-block">Car / Auto:</label>
+                                            <input type="number" step="100" class="form-control form-control-sm bg-dark text-white border-secondary text-xs"
+                                                   @bind="s.PriceCar" />
+                                        </div>
+                                        <div class="col-6 col-sm-4 col-md-3">
+                                            <label class="text-gray text-xs d-block">Jeepeta:</label>
+                                            <input type="number" step="100" class="form-control form-control-sm bg-dark text-white border-secondary text-xs"
+                                                   @bind="s.PriceJeepeta" />
+                                        </div>
+                                        <div class="col-6 col-sm-4 col-md-3">
+                                            <label class="text-gray text-xs d-block">SUV:</label>
+                                            <input type="number" step="100" class="form-control form-control-sm bg-dark text-white border-secondary text-xs"
+                                                   @bind="s.PriceSuv" />
+                                        </div>
+                                        <div class="col-6 col-sm-4 col-md-3">
+                                            <label class="text-gray text-xs d-block">Camioneta:</label>
+                                            <input type="number" step="100" class="form-control form-control-sm bg-dark text-white border-secondary text-xs"
+                                                   @bind="s.PriceCamioneta" />
+                                        </div>
+                                        <div class="col-6 col-sm-4 col-md-3">
+                                            <label class="text-gray text-xs d-block">Minivan:</label>
+                                            <input type="number" step="100" class="form-control form-control-sm bg-dark text-white border-secondary text-xs"
+                                                   @bind="s.PriceMinivan" />
+                                        </div>
+                                        <div class="col-6 col-sm-4 col-md-3">
+                                            <label class="text-gray text-xs d-block">Camión:</label>
+                                            <input type="number" step="100" class="form-control form-control-sm bg-dark text-white border-secondary text-xs"
+                                                   @bind="s.PriceCamion" />
+                                        </div>
+                                    </div>
+
+                                    <div class="text-end mt-3">
+                                        <button type="button" class="btn btn-sm btn-outline-danger px-3 py-1 text-xs fw-bold rounded-2" @onclick="() => GuardarCambiosPreciosServicio(s)">
+                                            <i class="fa-solid fa-check me-1"></i> Guardar Tarifas
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- ═══ TAB 3: OPCIONES DE ENTREGA ═════════════════════════════════════ -->
+        @if (tabActiva == "entrega")
+        {
+            <div class="row g-4">
+                <!-- FORMULARIO NUEVA MODALIDAD ENTREGA -->
+                <div class="col-lg-4">
+                    <div class="cfg-card h-100">
+                        <h4 class="text-white fw-bold mb-3 fs-5">
+                            <i class="fa-solid fa-plus text-red me-2"></i>Nueva Opcion de Entrega
+                        </h4>
+                        <div class="mb-3">
+                            <label class="form-label text-xs text-gray fw-bold text-uppercase">Nombre Modalidad *</label>
+                            <input type="text" class="form-control bg-dark text-white text-xs border-secondary"
+                                   placeholder="Ej: Valet Parking Exprés / Grúa Asistida"
+                                   @bind="nuevaEntregaNombre" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-xs text-gray fw-bold text-uppercase">Costo Adicional (DOP) *</label>
+                            <input type="number" step="100" class="form-control bg-dark text-white text-xs border-secondary"
+                                   @bind="nuevaEntregaCosto" />
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label text-xs text-gray fw-bold text-uppercase">Descripción</label>
+                            <input type="text" class="form-control bg-dark text-white text-xs border-secondary"
+                                   placeholder="Ej: Recogida en grúa plataforma equipada"
+                                   @bind="nuevaEntregaDesc" />
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(mensajeEntrega))
+                        {
+                            <div class="alert alert-info text-xs py-2 mb-3">@mensajeEntrega</div>
+                        }
+
+                        <button type="button" class="btn btn-danger w-100 py-2 text-xs fw-bold rounded-3" @onclick="GuardarNuevaEntrega">
+                            <i class="fa-solid fa-floppy-disk me-1"></i> Guardar Entrega
+                        </button>
+                    </div>
+                </div>
+
+                <!-- LISTA DE MODALIDADES -->
+                <div class="col-lg-8">
+                    <div class="cfg-card h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <div>
+                                <h4 class="text-white fw-bold mb-1 fs-5">Modalidades y Costos de Entrega</h4>
+                                <span class="text-gray text-xs">Define los recargos adicionales por servicios de recolección/delivery</span>
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            @foreach (var o in opcionesEntrega)
+                            {
+                                <div class="col-md-6">
+                                    <div class="p-3 rounded-3 border border-secondary border-opacity-25" style="background: #11131c;">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="fw-bold text-white fs-6">@o.Nombre</span>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="badge @(o.CostoAdicional == 0 ? "bg-success" : "bg-danger") px-3 py-1 fw-bold">
+                                                    @(o.CostoAdicional == 0 ? "SIN COSTO" : $"+${o.CostoAdicional:N2} DOP")
+                                                </span>
+                                                <button type="button" class="btn btn-sm btn-outline-danger px-2 py-0 text-xs" title="Eliminar Opción de Entrega" @onclick="() => EliminarEntrega(o.Id)">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <p class="text-gray text-xs mb-3">@o.Descripcion</p>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <label class="text-xs text-gray font-monospace me-2">Editar Tarifa (DOP):</label>
+                                            <input type="number" step="50" class="form-control form-control-sm bg-dark text-white border-secondary"
+                                                   style="max-width: 140px;" value="@o.CostoAdicional" @onchange='(e) => ActualizarTarifaEntrega(o, e.Value?.ToString())' />
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- ═══ TAB 4: BLOQUEOS DE CALENDARIO ══════════════════════════════════ -->
+        @if (tabActiva == "calendario")
+        {
+            <div class="row g-4">
+                <!-- FORMULARIO AGREGAR BLOQUEO -->
+                <div class="col-lg-5">
+                    <div class="cfg-card h-100">
+                        <h4 class="text-white fw-bold mb-3 fs-5">
+                            <i class="fa-solid fa-lock text-red me-2"></i>Agregar Nuevo Bloqueo
+                        </h4>
+
+                        <div class="mb-3">
+                            <label class="form-label text-xs text-gray fw-bold text-uppercase">Tipo de Bloqueo</label>
+                            <select class="form-select bg-dark text-white text-xs border-secondary" @onchange="OnTipoBloqueoChanged" value="@tipoBloqueo">
+                                <option value="fecha">Fecha Específica (Ej: Feriado / Mantenimiento)</option>
+                                <option value="recurrente">Día Recurrente de la Semana (Ej: Domingos)</option>
+                            </select>
+                        </div>
+
+                        @if (tipoBloqueo == "fecha")
+                        {
+                            <div class="mb-3">
+                                <label class="form-label text-xs text-gray fw-bold text-uppercase">Fecha a Bloquear</label>
+                                <input type="date" class="form-control bg-dark text-white text-xs border-secondary"
+                                       min="@DateTime.Today.ToString("yyyy-MM-dd")"
+                                       value="@nuevaFechaBloqueada.ToString("yyyy-MM-dd")"
+                                       @onchange="OnFechaBloqueadaChanged" style="color-scheme: dark;" />
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="mb-3">
+                                <label class="form-label text-xs text-gray fw-bold text-uppercase">Día de la Semana</label>
+                                <select class="form-select bg-dark text-white text-xs border-secondary" value="@nuevoDiaSemana" @onchange="OnDiaSemanaChanged">
+                                    <option value="0">Domingo</option>
+                                    <option value="1">Lunes</option>
+                                    <option value="2">Martes</option>
+                                    <option value="3">Miércoles</option>
+                                    <option value="4">Jueves</option>
+                                    <option value="5">Viernes</option>
+                                    <option value="6">Sábado</option>
+                                </select>
+                            </div>
+                        }
+
+                        <div class="mb-4">
+                            <label class="form-label text-xs text-gray fw-bold text-uppercase">Motivo del Bloqueo</label>
+                            <input type="text" class="form-control bg-dark text-white text-xs border-secondary"
+                                   placeholder="Ej: Cerrado por día festivo o mantenimiento"
+                                   @bind="nuevoMotivo" />
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(mensajeErrorBloqueo))
+                        {
+                            <div class="alert alert-danger text-xs py-2 mb-3">@mensajeErrorBloqueo</div>
+                        }
+
+                        <button type="button" class="btn btn-danger w-100 py-2 text-xs fw-bold rounded-3" @onclick="GuardarBloqueo" disabled="@guardandoBloqueo">
+                            @if (guardandoBloqueo)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                                <span>Guardando...</span>
+                            }
+                            else
+                            {
+                                <i class="fa-solid fa-plus me-1"></i>
+                                <span>Bloquear en Agenda</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+
+                <!-- LISTA DE BLOQUEOS ACTIVOS -->
+                <div class="col-lg-7">
+                    <div class="cfg-card h-100">
+                        <h4 class="text-white fw-bold mb-3 fs-5">Bloqueos de Agenda Registrados</h4>
+                        @if (!bloqueos.Any())
+                        {
+                            <div class="text-center py-4">
+                                <i class="fa-solid fa-calendar-check text-gray display-6 mb-2 opacity-30"></i>
+                                <p class="text-gray text-xs">No hay fechas ni días bloqueados actualmente.</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table text-white align-middle mb-0 text-xs" style="--bs-table-bg: transparent; --bs-table-color: #fff;">
+                                    <thead>
+                                        <tr class="text-gray text-uppercase font-monospace border-bottom border-secondary border-opacity-50">
+                                            <th class="py-2 border-0">Bloqueo</th>
+                                            <th class="py-2 border-0">Motivo</th>
+                                            <th class="py-2 border-0 text-end">Acción</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var b in bloqueos)
+                                        {
+                                            <tr class="border-bottom border-secondary border-opacity-25">
+                                                <td class="py-3 border-0">
+                                                    @if (b.EsRecurrente && b.DiaSemana.HasValue)
+                                                    {
+                                                        <span class="badge bg-warning text-dark font-monospace fw-bold px-2 py-1 me-2">RECURRENTE</span>
+                                                        <strong class="text-white">Todos los @GetNombreDia(b.DiaSemana.Value)s</strong>
+                                                    }
+                                                    else if (b.FechaBloqueada.HasValue)
+                                                    {
+                                                        <span class="badge bg-danger text-white font-monospace fw-bold px-2 py-1 me-2">FECHA</span>
+                                                        <strong class="text-white">@b.FechaBloqueada.Value.ToString("dd/MM/yyyy (dddd)")</strong>
+                                                    }
+                                                </td>
+                                                <td class="py-3 border-0 text-gray">
+                                                    @(string.IsNullOrEmpty(b.Motivo) ? "Cerrado" : b.Motivo)
+                                                </td>
+                                                <td class="py-3 border-0 text-end">
+                                                    <button type="button" class="btn btn-sm btn-outline-danger px-2 py-1 rounded-2 text-xs" title="Eliminar Bloqueo" @onclick="() => EliminarBloqueo(b.Id)">
+                                                        <i class="fa-solid fa-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+</main>
+
+<style>
+    .cfg-card {
+        background: #0b0c10;
+        border: 1px solid #1c202d;
+        border-radius: 14px;
+        padding: 24px;
+    }
+
+    .rpt-tab-btn {
+        background: transparent;
+        border: none;
+        color: #8a94a6;
+        padding: 10px 18px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        border-bottom: 2px solid transparent;
+        border-radius: 0;
+        transition: all 0.15s ease;
+    }
+    .rpt-tab-btn:hover {
+        color: #ffffff;
+    }
+    .rpt-tab-btn.active {
+        color: #ffffff;
+        border-bottom-color: #e60000;
+        background: rgba(230, 0, 0, 0.05);
+    }
+</style>
+
+@code {
+    private bool cargando = true;
+    private string tabActiva = "categorias";
+
+    private List<CategoriaVehiculoDto> categorias = new();
+    private List<ServiceGroup> servicios = new();
+    private List<BloqueoCalendarioDto> bloqueos = new();
+    private List<OpcionEntregaDto> opcionesEntrega = new();
+
+    // Formulario Nueva Categoría
+    private string nuevaCategoriaNombre = "";
+    private string nuevaCategoriaCodigo = "";
+    private string mensajeCategoria = "";
+
+    // Formulario Nuevo Servicio
+    private string nuevoServicioNombre = "";
+    private string nuevoServicioDesc = "";
+    private decimal nuevoServicioPrecioCar = 0;
+    private decimal nuevoServicioPrecioSuv = 0;
+    private string mensajeServicio = "";
+
+    // Formulario Nueva Entrega
+    private string nuevaEntregaNombre = "";
+    private decimal nuevaEntregaCosto = 0;
+    private string nuevaEntregaDesc = "";
+    private string mensajeEntrega = "";
+
+    // Formulario Bloqueo
+    private string tipoBloqueo = "fecha";
+    private DateTime nuevaFechaBloqueada = DateTime.Today.AddDays(1);
+    private int nuevoDiaSemana = 0; // 0=Domingo
+    private string nuevoMotivo = "";
+    private string mensajeErrorBloqueo = "";
+    private bool guardandoBloqueo = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarDatos();
+    }
+
+    private async Task CargarDatos()
+    {
+        cargando = true;
+        categorias = await BookingService.ObtenerCategoriasVehiculoAsync();
+        servicios = await BookingService.GetActiveServiceGroupsAsync();
+        bloqueos = await BookingService.ObtenerBloqueosCalendarioAsync();
+        opcionesEntrega = await BookingService.ObtenerOpcionesEntregaAsync();
+        cargando = false;
+    }
+
+    private void CambiarTab(string tab)
+    {
+        tabActiva = tab;
+    }
+
+    private async Task GuardarNuevaCategoria()
+    {
+        if (string.IsNullOrWhiteSpace(nuevaCategoriaNombre) || string.IsNullOrWhiteSpace(nuevaCategoriaCodigo))
+        {
+            mensajeCategoria = "Por favor completa el nombre y código de la categoría.";
+            return;
+        }
+
+        if (categorias.Any(c => c.Nombre.Equals(nuevaCategoriaNombre, StringComparison.OrdinalIgnoreCase) || c.Codigo.Equals(nuevaCategoriaCodigo, StringComparison.OrdinalIgnoreCase)))
+        {
+            mensajeCategoria = "Esta categoría o código ya existe registrada.";
+            return;
+        }
+
+        var cat = new CategoriaVehiculoDto
+        {
+            Nombre = nuevaCategoriaNombre.Trim(),
+            Codigo = nuevaCategoriaCodigo.Trim()
+        };
+
+        bool ok = await BookingService.CrearCategoriaVehiculoAsync(cat);
+        if (ok)
+        {
+            nuevaCategoriaNombre = "";
+            nuevaCategoriaCodigo = "";
+            mensajeCategoria = "Categoría registrada exitosamente.";
+            await CargarDatos();
+        }
+        else
+        {
+            mensajeCategoria = "Error al registrar la categoría.";
+        }
+    }
+
+    private async Task GuardarNuevoServicio()
+    {
+        if (string.IsNullOrWhiteSpace(nuevoServicioNombre))
+        {
+            mensajeServicio = "Ingresa el nombre del servicio.";
+            return;
+        }
+
+        var s = new ServiceGroup
+        {
+            Name = nuevoServicioNombre.Trim(),
+            Description = nuevoServicioDesc.Trim(),
+            PriceCar = nuevoServicioPrecioCar,
+            PriceJeepeta = nuevoServicioPrecioSuv > 0 ? nuevoServicioPrecioSuv : nuevoServicioPrecioCar,
+            PriceSuv = nuevoServicioPrecioSuv,
+            PriceCamioneta = nuevoServicioPrecioSuv,
+            PriceMinivan = nuevoServicioPrecioCar,
+            PriceCamion = nuevoServicioPrecioSuv,
+            PriceCamionDosEjes = nuevoServicioPrecioSuv,
+            PriceTrailer = nuevoServicioPrecioSuv
+        };
+
+        bool ok = await BookingService.CrearServicioGrupoAsync(s);
+        if (ok)
+        {
+            nuevoServicioNombre = "";
+            nuevoServicioDesc = "";
+            nuevoServicioPrecioCar = 0;
+            nuevoServicioPrecioSuv = 0;
+            mensajeServicio = "Servicio añadido al catálogo.";
+            await CargarDatos();
+        }
+        else
+        {
+            mensajeServicio = "Error al crear el servicio.";
+        }
+    }
+
+    private async Task GuardarCambiosPreciosServicio(ServiceGroup s)
+    {
+        bool ok = await BookingService.ActualizarServicioGrupoPreciosAsync(s);
+        if (ok)
+        {
+            await CargarDatos();
+        }
+    }
+
+    private async Task GuardarNuevaEntrega()
+    {
+        if (string.IsNullOrWhiteSpace(nuevaEntregaNombre))
+        {
+            mensajeEntrega = "Ingresa el nombre de la modalidad de entrega.";
+            return;
+        }
+
+        var o = new OpcionEntregaDto
+        {
+            Nombre = nuevaEntregaNombre.Trim(),
+            CostoAdicional = nuevaEntregaCosto,
+            Descripcion = nuevaEntregaDesc.Trim(),
+            Activo = true
+        };
+
+        bool ok = await BookingService.GuardarOpcionEntregaAsync(o);
+        if (ok)
+        {
+            nuevaEntregaNombre = "";
+            nuevaEntregaCosto = 0;
+            nuevaEntregaDesc = "";
+            mensajeEntrega = "Modalidad de entrega registrada.";
+            await CargarDatos();
+        }
+    }
+
+    private void OnTipoBloqueoChanged(ChangeEventArgs e)
+    {
+        tipoBloqueo = e.Value?.ToString() ?? "fecha";
+    }
+
+    private void OnFechaBloqueadaChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var dt))
+        {
+            nuevaFechaBloqueada = dt;
+        }
+    }
+
+    private void OnDiaSemanaChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var day))
+        {
+            nuevoDiaSemana = day;
+        }
+    }
+
+    private async Task GuardarBloqueo()
+    {
+        mensajeErrorBloqueo = "";
+        guardandoBloqueo = true;
+
+        var dto = new BloqueoCalendarioDto
+        {
+            EsRecurrente = tipoBloqueo == "recurrente",
+            FechaBloqueada = tipoBloqueo == "fecha" ? nuevaFechaBloqueada : null,
+            DiaSemana = tipoBloqueo == "recurrente" ? nuevoDiaSemana : null,
+            Motivo = nuevoMotivo
+        };
+
+        bool ok = await BookingService.CrearBloqueoCalendarioAsync(dto);
+        guardandoBloqueo = false;
+
+        if (ok)
+        {
+            nuevoMotivo = "";
+            bloqueos = await BookingService.ObtenerBloqueosCalendarioAsync();
+        }
+        else
+        {
+            mensajeErrorBloqueo = "Error al registrar el bloqueo. Intenta nuevamente.";
+        }
+    }
+
+    private async Task EliminarCategoria(int id)
+    {
+        bool ok = await BookingService.EliminarCategoriaVehiculoAsync(id);
+        if (ok)
+        {
+            await CargarDatos();
+        }
+    }
+
+    private async Task EliminarServicio(long id)
+    {
+        bool ok = await BookingService.EliminarServicioGrupoAsync(id);
+        if (ok)
+        {
+            await CargarDatos();
+        }
+    }
+
+    private async Task EliminarEntrega(int id)
+    {
+        bool ok = await BookingService.EliminarOpcionEntregaAsync(id);
+        if (ok)
+        {
+            await CargarDatos();
+        }
+    }
+
+    private async Task EliminarBloqueo(int id)
+    {
+        bool ok = await BookingService.EliminarBloqueoCalendarioAsync(id);
+        if (ok)
+        {
+            bloqueos = await BookingService.ObtenerBloqueosCalendarioAsync();
+        }
+    }
+
+    private async Task ActualizarTarifaEntrega(OpcionEntregaDto opcion, string? valor)
+    {
+        if (decimal.TryParse(valor, out decimal nuevoCosto))
+        {
+            opcion.CostoAdicional = Math.Max(0, nuevoCosto);
+            await BookingService.GuardarOpcionEntregaAsync(opcion);
+            opcionesEntrega = await BookingService.ObtenerOpcionesEntregaAsync();
+        }
+    }
+
+    private string GetNombreDia(int dayIndex) => dayIndex switch
+    {
+        0 => "Domingo",
+        1 => "Lunes",
+        2 => "Martes",
+        3 => "Miércoles",
+        4 => "Jueves",
+        5 => "Viernes",
+        6 => "Sábado",
+        _ => "Día"
+    };
+}

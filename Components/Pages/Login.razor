@@ -1,0 +1,242 @@
+@page "/login"
+@using BlazorAGS.Models
+@using BlazorAGS.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthService AuthService
+@inject CustomAuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+<PageTitle>Iniciar Sesión / Registro - AGS Select</PageTitle>
+
+<div class="ags-auth-container min-vh-100 d-flex align-items-center justify-content-center py-5 px-3">
+    <div class="ags-auth-card shadow-lg rounded-4 overflow-hidden position-relative" style="width: 100%; max-width: 460px; background: #121214; border: 1px solid rgba(255,255,255,0.08);">
+        
+        <!-- HEADER DE LA TARJETA -->
+        <div class="text-center pt-4 pb-3 px-4 position-relative">
+            <div class="mb-2">
+                <span class="fs-4 fw-black text-white" style="letter-spacing: 2px;">AGS <span class="text-red">SELECT</span></span>
+            </div>
+            <p class="text-gray text-xs text-uppercase mb-0" style="letter-spacing: 1px;">Acceso a Clientes & Reservas</p>
+        </div>
+
+        <!-- TABS LOGIN / REGISTRO -->
+        <div class="d-flex border-bottom border-secondary border-opacity-15 bg-black bg-opacity-40">
+            <button type="button" class="btn w-50 py-3 rounded-0 fw-bold text-xs text-uppercase transition-all @(esLogin ? "text-white border-bottom border-danger border-2 bg-dark" : "text-gray hover-white")"
+                    @onclick="() => CambiarTab(true)">
+                <i class="fa-solid fa-right-to-bracket me-2 text-red"></i>Iniciar Sesión
+            </button>
+            <button type="button" class="btn w-50 py-3 rounded-0 fw-bold text-xs text-uppercase transition-all @(!esLogin ? "text-white border-bottom border-danger border-2 bg-dark" : "text-gray hover-white")"
+                    @onclick="() => CambiarTab(false)">
+                <i class="fa-solid fa-user-plus me-2 text-red"></i>Registrarse
+            </button>
+        </div>
+
+        <!-- CUERPO DEL FORMULARIO -->
+        <div class="p-4 p-md-5">
+
+            <!-- MENSAJES DE ERROR O ÉXITO CON ANIMACIÓN -->
+            @if (!string.IsNullOrEmpty(mensajeError))
+            {
+                <div class="alert alert-danger border-0 rounded-3 text-xs fw-medium d-flex align-items-center gap-2 mb-4 animate__animated animate__fadeIn"
+                     style="background: rgba(220,53,69,0.15); color: #ff6b7a;">
+                    <i class="fa-solid fa-circle-exclamation fs-6 flex-shrink-0"></i>
+                    <span>@mensajeError</span>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(mensajeExito))
+            {
+                <div class="alert alert-success border-0 rounded-3 text-xs fw-medium d-flex align-items-center gap-2 mb-4 animate__animated animate__fadeIn"
+                     style="background: rgba(40,167,69,0.15); color: #4cd964;">
+                    <i class="fa-solid fa-circle-check fs-6 flex-shrink-0"></i>
+                    <span>@mensajeExito</span>
+                </div>
+            }
+
+            <!-- FORMULARIO DE LOGIN -->
+            @if (esLogin)
+            {
+                <EditForm Model="loginModel" OnValidSubmit="ProcesarLogin">
+                    <div class="mb-3">
+                        <label class="ags-form-label mb-2">Correo Electrónico *</label>
+                        <div class="position-relative">
+                            <input type="email" class="ags-form-input ps-5" placeholder="tuemail@ejemplo.com" @bind="loginModel.Correo" required />
+                            <i class="fa-solid fa-envelope position-absolute top-50 start-0 translate-middle-y ms-3 text-gray text-xs"></i>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="ags-form-label mb-2">Contraseña *</label>
+                        <div class="position-relative">
+                            <input type="@(mostrarPassword ? "text" : "password")" class="ags-form-input ps-5 pe-5" placeholder="••••••••" @bind="loginModel.Password" required />
+                            <i class="fa-solid fa-lock position-absolute top-50 start-0 translate-middle-y ms-3 text-gray text-xs"></i>
+                            <button type="button" class="btn p-0 position-absolute top-50 end-0 translate-middle-y me-3 text-gray border-0 bg-transparent text-xs hover-white"
+                                    @onclick="() => mostrarPassword = !mostrarPassword">
+                                <i class="fa-solid @(mostrarPassword ? "fa-eye-slash" : "fa-eye")"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-ags-red w-100 py-3 rounded-3 d-flex align-items-center justify-content-center gap-2" disabled="@cargando">
+                        @if (cargando)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Verificando credenciales...</span>
+                        }
+                        else
+                        {
+                            <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                            <span>Ingresar al Sistema</span>
+                        }
+                    </button>
+                </EditForm>
+            }
+            else
+            {
+                <!-- FORMULARIO DE REGISTRO -->
+                <EditForm Model="registroModel" OnValidSubmit="ProcesarRegistro">
+                    <div class="mb-3">
+                        <label class="ags-form-label mb-2">Nombre Completo *</label>
+                        <div class="position-relative">
+                            <input type="text" class="ags-form-input ps-5" placeholder="Juan Pérez" @bind="registroModel.Nombre" required />
+                            <i class="fa-solid fa-user position-absolute top-50 start-0 translate-middle-y ms-3 text-gray text-xs"></i>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="ags-form-label mb-2">Correo Electrónico *</label>
+                        <div class="position-relative">
+                            <input type="email" class="ags-form-input ps-5" placeholder="tuemail@ejemplo.com" @bind="registroModel.Correo" required />
+                            <i class="fa-solid fa-envelope position-absolute top-50 start-0 translate-middle-y ms-3 text-gray text-xs"></i>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="ags-form-label mb-2">Teléfono / WhatsApp</label>
+                        <div class="position-relative">
+                            <input type="tel" class="ags-form-input ps-5" placeholder="(809) 000-0000" @bind="registroModel.Telefono" />
+                            <i class="fa-solid fa-phone position-absolute top-50 start-0 translate-middle-y ms-3 text-gray text-xs"></i>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="ags-form-label mb-2">Contraseña *</label>
+                        <div class="position-relative">
+                            <input type="@(mostrarPassword ? "text" : "password")" class="ags-form-input ps-5 pe-5" placeholder="Mínimo 6 caracteres" @bind="registroModel.Password" required />
+                            <i class="fa-solid fa-lock position-absolute top-50 start-0 translate-middle-y ms-3 text-gray text-xs"></i>
+                            <button type="button" class="btn p-0 position-absolute top-50 end-0 translate-middle-y me-3 text-gray border-0 bg-transparent text-xs hover-white"
+                                    @onclick="() => mostrarPassword = !mostrarPassword">
+                                <i class="fa-solid @(mostrarPassword ? "fa-eye-slash" : "fa-eye")"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="ags-form-label mb-2">Confirmar Contraseña *</label>
+                        <div class="position-relative">
+                            <input type="@(mostrarPassword ? "text" : "password")" class="ags-form-input ps-5" placeholder="Repite tu contraseña" @bind="registroModel.ConfirmPassword" required />
+                            <i class="fa-solid fa-shield-halved position-absolute top-50 start-0 translate-middle-y ms-3 text-gray text-xs"></i>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-ags-red w-100 py-3 rounded-3 d-flex align-items-center justify-content-center gap-2" disabled="@cargando">
+                        @if (cargando)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Creando cuenta segura...</span>
+                        }
+                        else
+                        {
+                            <i class="fa-solid fa-user-check"></i>
+                            <span>Completar Registro</span>
+                        }
+                    </button>
+                </EditForm>
+            }
+
+        </div>
+
+        <!-- FOOTER -->
+        <div class="p-3 text-center bg-black bg-opacity-60 border-top border-secondary border-opacity-15">
+            <span class="text-gray text-xs">Protegido con encriptación BCrypt & Tokens JWT de 256 bits</span>
+        </div>
+
+    </div>
+</div>
+
+@code {
+    private bool esLogin = true;
+    private bool cargando = false;
+    private bool mostrarPassword = false;
+
+    private string? mensajeError;
+    private string? mensajeExito;
+
+    private LoginModel loginModel = new();
+    private RegistroModel registroModel = new();
+
+    private void CambiarTab(bool esTabLogin)
+    {
+        esLogin = esTabLogin;
+        mensajeError = null;
+        mensajeExito = null;
+    }
+
+    private async Task ProcesarLogin()
+    {
+        mensajeError = null;
+        mensajeExito = null;
+        cargando = true;
+
+        StateHasChanged();
+        await Task.Delay(300); // Suave micro-delay para la UX del spinner
+
+        var response = await AuthService.LoginAsync(loginModel);
+        cargando = false;
+
+        if (response.Exito && !string.IsNullOrEmpty(response.Token))
+        {
+            mensajeExito = "¡Sesión iniciada con éxito! Redirigiendo...";
+            await AuthStateProvider.MarkUserAsAuthenticated(response.Token);
+            StateHasChanged();
+            await Task.Delay(800);
+            Navigation.NavigateTo("/reserva");
+        }
+        else
+        {
+            mensajeError = response.Mensaje;
+        }
+    }
+
+    private async Task ProcesarRegistro()
+    {
+        mensajeError = null;
+        mensajeExito = null;
+
+        if (registroModel.Password.Length < 6)
+        {
+            mensajeError = "La contraseña debe tener al menos 6 caracteres.";
+            return;
+        }
+
+        cargando = true;
+        StateHasChanged();
+        await Task.Delay(300);
+
+        var response = await AuthService.RegistrarAsync(registroModel);
+        cargando = false;
+
+        if (response.Exito && !string.IsNullOrEmpty(response.Token))
+        {
+            mensajeExito = response.Mensaje + " Redirigiendo a tu reserva...";
+            await AuthStateProvider.MarkUserAsAuthenticated(response.Token);
+            StateHasChanged();
+            await Task.Delay(1000);
+            Navigation.NavigateTo("/reserva");
+        }
+        else
+        {
+            mensajeError = response.Mensaje;
+        }
+    }
+}

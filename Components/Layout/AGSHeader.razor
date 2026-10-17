@@ -1,0 +1,399 @@
+@rendermode InteractiveServer
+@using BlazorAGS.Services
+@using BlazorAGS.Models
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Nav
+@inject AuthService AuthService
+@inject CustomAuthenticationStateProvider AuthStateProvider
+
+<header class="ags-navbar" id="main-navbar">
+    <div class="container d-flex align-items-center justify-content-between">
+        
+        <!-- LOGO -->
+        <a href="/" class="d-flex align-items-center" style="flex-shrink:0;">
+            <img src="/images/logo_ags.png" alt="AGS Select" style="height: 44px; width: auto;" />
+        </a>
+
+        <!-- NAV LINKS (desktop) -->
+        <nav class="d-none d-lg-flex align-items-center gap-4">
+            <a href="/"          class="nav-link-item">Inicio</a>
+            <a href="#servicios" class="nav-link-item">Servicios</a>
+            <a href="#nosotros"  class="nav-link-item">Nosotros</a>
+            <a href="#paquetes"  class="nav-link-item">Paquetes</a>
+        </nav>
+
+        <!-- AUTH + CTA -->
+        <div class="d-flex align-items-center gap-2">
+            <AuthorizeView>
+                <Authorized>
+                    <!-- DROPDOWN USUARIO AUTENTICADO -->
+                    <div class="dropdown position-relative">
+                        <button class="user-avatar-btn dropdown-toggle border-0 bg-transparent" type="button" @onclick="ToggleDropdown">
+                            <span class="user-avatar-circle">
+                                @(context.User.Identity?.Name != null && context.User.Identity.Name.Length > 0 ? context.User.Identity.Name[0].ToString().ToUpper() : "U")
+                            </span>
+                            <span class="d-none d-md-inline fw-bold text-white text-xs ms-1">@context.User.Identity?.Name</span>
+                            <span class="badge bg-danger text-uppercase ms-1" style="font-size:0.6rem;">@context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span>
+                            <i class="fa-solid fa-chevron-down ms-1 text-gray" style="font-size:0.7rem;"></i>
+                        </button>
+
+                        @if (dropdownOpen)
+                        {
+                            <div class="dropdown-menu dropdown-menu-dark show position-absolute end-0 mt-2 py-2 shadow-lg border border-secondary border-opacity-25 rounded-3"
+                                 style="background: #18181b; min-width: 200px; z-index: 1050;">
+                                <div class="px-3 py-2 border-bottom border-secondary border-opacity-25 mb-1">
+                                    <span class="d-block text-white fw-bold text-xs">@context.User.Identity?.Name</span>
+                                    <span class="d-block text-gray text-xs opacity-75">@context.User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value</span>
+                                </div>
+                                <a class="dropdown-item py-2 text-xs text-white d-flex align-items-center gap-2 hover-red" href="/dashboard/perfil" @onclick="CloseDropdown">
+                                    <i class="fa-regular fa-user text-red"></i>
+                                    <span>Mi Perfil</span>
+                                </a>
+                                <a class="dropdown-item py-2 text-xs text-white d-flex align-items-center gap-2 hover-red" href="/dashboard/reservas" @onclick="CloseDropdown">
+                                    <i class="fa-solid fa-calendar-check text-red"></i>
+                                    <span>Mis Citas / Reservas</span>
+                                </a>
+                                <div class="dropdown-divider border-secondary border-opacity-25 my-1"></div>
+                                <button class="dropdown-item py-2 text-xs text-danger d-flex align-items-center gap-2 w-100 border-0 bg-transparent" @onclick="PedirConfirmacionLogout">
+                                    <i class="fa-solid fa-right-from-bracket"></i>
+                                    <span>Cerrar Sesión</span>
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </Authorized>
+                <NotAuthorized>
+                    <button class="btn-nav-auth" @onclick='() => AbrirModal("login")'>
+                        <i class="fa-regular fa-user"></i>
+                        <span class="d-none d-md-inline">Iniciar Sesión</span>
+                    </button>
+                    <button class="btn-nav-auth" @onclick='() => AbrirModal("registro")'>
+                        Registrarse
+                    </button>
+                    <a href="/reserva" class="btn-nav-auth d-none d-lg-inline-flex">
+                        <i class="fa-solid fa-calendar-check"></i>
+                        <span>Agendar Cita</span>
+                    </a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </div>
+</header>
+
+<!-- ========================================
+     MODAL CONFIRMACIÓN DE CERRAR SESIÓN
+======================================== -->
+@if (confirmarLogoutVisible)
+{
+    <div class="auth-overlay" @onclick="CancelarLogout">
+        <div class="auth-modal text-center p-4" style="max-width: 400px;" @onclick:stopPropagation="true">
+            <div class="mb-3">
+                <div class="d-inline-flex align-items-center justify-content-center bg-danger bg-opacity-10 text-red rounded-circle p-3 mb-2" style="width: 60px; height: 60px;">
+                    <i class="fa-solid fa-right-from-bracket fs-3"></i>
+                </div>
+                <h5 class="text-white fw-bold mb-1">¿Cerrar Sesión?</h5>
+                <p class="text-gray text-xs mb-0">¿Estás seguro de que deseas salir de tu cuenta de AGS Select?</p>
+            </div>
+            <div class="d-flex gap-2 justify-content-center mt-4">
+                <button type="button" class="btn btn-outline-secondary text-white w-50 py-2 text-xs rounded-3" @onclick="CancelarLogout">
+                    Cancelar
+                </button>
+                <button type="button" class="btn btn-danger w-50 py-2 text-xs fw-bold rounded-3" @onclick="ConfirmarCerrarSesion">
+                    <i class="fa-solid fa-check me-1"></i> Sí, Salir
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ========================================
+     AUTH MODAL CONECTADO A BD + JWT
+======================================== -->
+@if (modalVisible)
+{
+    <div class="auth-overlay" @onclick="CerrarModal">
+        <div class="auth-modal" @onclick:stopPropagation="true">
+            
+            <button class="auth-close" @onclick="CerrarModal">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <div class="text-center mb-4">
+                <img src="/images/logo_ags.png" alt="AGS Select" style="height: 38px; width: auto;" />
+            </div>
+
+            <!-- TABS -->
+            <div class="auth-tabs">
+                <button class="auth-tab @(modoActivo == "login" ? "active" : "")" @onclick='() => CambiarModo("login")'>
+                    Iniciar Sesión
+                </button>
+                <button class="auth-tab @(modoActivo == "registro" ? "active" : "")" @onclick='() => CambiarModo("registro")'>
+                    Registrarse
+                </button>
+            </div>
+
+            <!-- ERROR / EXITO MESSAGE -->
+            @if (!string.IsNullOrEmpty(errorMsg))
+            {
+                <div class="auth-error-msg">
+                    <i class="fa-solid fa-circle-exclamation me-2"></i>@errorMsg
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(exitoMsg))
+            {
+                <div class="auth-error-msg" style="background: rgba(40,167,69,0.15); border-color: rgba(40,167,69,0.3); color: #4cd964;">
+                    <i class="fa-solid fa-circle-check me-2"></i>@exitoMsg
+                </div>
+            }
+
+            <!-- ======= LOGIN ======= -->
+            @if (modoActivo == "login")
+            {
+                <div class="auth-form">
+                    <div class="auth-field">
+                        <label class="ags-form-label">Correo Electrónico</label>
+                        <input type="email" class="ags-form-input" placeholder="correo@ejemplo.com" @bind="loginEmail" />
+                    </div>
+                    <div class="auth-field">
+                        <label class="ags-form-label">Contraseña</label>
+                        <input type="password" class="ags-form-input" placeholder="••••••••" @bind="loginPassword" />
+                    </div>
+                    <div class="d-flex justify-content-end mb-4">
+                        <button class="btn-link-subtle" type="button">¿Olvidaste tu contraseña?</button>
+                    </div>
+                    <button class="btn-ags-red w-100 justify-content-center py-3" @onclick="IniciarSesion" disabled="@cargando">
+                        @if (cargando)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Verificando...</span>
+                        }
+                        else
+                        {
+                            <i class="fa-solid fa-right-to-bracket"></i>
+                            <span>Iniciar Sesión</span>
+                        }
+                    </button>
+                    <p class="text-center text-gray text-xs mt-4 mb-0">
+                        ¿No tienes cuenta? 
+                        <button class="btn-link-subtle" @onclick='() => CambiarModo("registro")'>Regístrate aquí</button>
+                    </p>
+                </div>
+            }
+
+            <!-- ======= REGISTRO ======= -->
+            @if (modoActivo == "registro")
+            {
+                <div class="auth-form">
+                    <div class="auth-field">
+                        <label class="ags-form-label">Nombre Completo</label>
+                        <input type="text" class="ags-form-input" placeholder="Tu nombre completo" @bind="regNombre" />
+                    </div>
+                    <div class="auth-field mt-3">
+                        <label class="ags-form-label">Correo Electrónico</label>
+                        <input type="email" class="ags-form-input" placeholder="correo@ejemplo.com" @bind="regEmail" />
+                    </div>
+                    <div class="auth-field">
+                        <label class="ags-form-label">Teléfono / WhatsApp</label>
+                        <input type="tel" class="ags-form-input" placeholder="(809) 000-0000" @bind="regTelefono" />
+                    </div>
+                    <div class="auth-field">
+                        <label class="ags-form-label">Contraseña</label>
+                        <input type="password" class="ags-form-input" placeholder="Mínimo 6 caracteres" @bind="regPassword" />
+                    </div>
+                    <div class="auth-field">
+                        <label class="ags-form-label">Confirmar Contraseña</label>
+                        <input type="password" class="ags-form-input" placeholder="Repite tu contraseña" @bind="regConfirmPassword" />
+                    </div>
+                    <button class="btn-ags-red w-100 justify-content-center py-3 mt-1" @onclick="Registrar" disabled="@cargando">
+                        @if (cargando)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Creando cuenta...</span>
+                        }
+                        else
+                        {
+                            <i class="fa-solid fa-user-plus"></i>
+                            <span>Crear Cuenta</span>
+                        }
+                    </button>
+                    <p class="text-center text-gray text-xs mt-4 mb-0">
+                        ¿Ya tienes cuenta? 
+                        <button class="btn-link-subtle" @onclick='() => CambiarModo("login")'>Inicia sesión</button>
+                    </p>
+                </div>
+            }
+
+        </div>
+    </div>
+}
+
+<script>
+    window.addEventListener('scroll', function () {
+        var nav = document.getElementById('main-navbar');
+        if (nav) nav.classList.toggle('scrolled', window.scrollY > 60);
+    });
+</script>
+
+@code {
+    private bool modalVisible = false;
+    private bool cargando = false;
+    private string modoActivo = "login";
+    private string errorMsg = "";
+    private string exitoMsg = "";
+
+    // Login fields
+    private string loginEmail = "";
+    private string loginPassword = "";
+
+    // Registro fields
+    private string regNombre = "";
+    private string regEmail = "";
+    private string regTelefono = "";
+    private string regPassword = "";
+    private string regConfirmPassword = "";
+
+    private void AbrirModal(string modo)
+    {
+        errorMsg = "";
+        exitoMsg = "";
+        modoActivo = modo;
+        modalVisible = true;
+    }
+
+    private void CerrarModal()
+    {
+        modalVisible = false;
+        errorMsg = "";
+        exitoMsg = "";
+        loginEmail = "";
+        loginPassword = "";
+        regNombre = "";
+        regEmail = "";
+        regTelefono = "";
+        regPassword = "";
+        regConfirmPassword = "";
+    }
+
+    private void CambiarModo(string modo)
+    {
+        errorMsg = "";
+        exitoMsg = "";
+        modoActivo = modo;
+    }
+
+    private async Task IniciarSesion()
+    {
+        errorMsg = "";
+        exitoMsg = "";
+
+        if (string.IsNullOrWhiteSpace(loginEmail) || string.IsNullOrWhiteSpace(loginPassword))
+        {
+            errorMsg = "Por favor ingresa tu correo y contraseña.";
+            return;
+        }
+
+        cargando = true;
+        StateHasChanged();
+
+        var model = new LoginModel { Correo = loginEmail, Password = loginPassword };
+        var response = await AuthService.LoginAsync(model);
+        cargando = false;
+
+        if (response.Exito && !string.IsNullOrEmpty(response.Token))
+        {
+            exitoMsg = "¡Sesión iniciada con éxito!";
+            await AuthStateProvider.MarkUserAsAuthenticated(response.Token);
+            StateHasChanged();
+            await Task.Delay(600);
+            CerrarModal();
+        }
+        else
+        {
+            errorMsg = response.Mensaje;
+        }
+    }
+
+    private async Task Registrar()
+    {
+        errorMsg = "";
+        exitoMsg = "";
+
+        if (string.IsNullOrWhiteSpace(regNombre) || string.IsNullOrWhiteSpace(regEmail) || string.IsNullOrWhiteSpace(regPassword))
+        {
+            errorMsg = "Por favor completa los campos obligatorios.";
+            return;
+        }
+
+        if (regPassword.Length < 6)
+        {
+            errorMsg = "La contraseña debe tener al menos 6 caracteres.";
+            return;
+        }
+
+        if (regPassword != regConfirmPassword)
+        {
+            errorMsg = "Las contraseñas no coinciden.";
+            return;
+        }
+
+        cargando = true;
+        StateHasChanged();
+
+        var model = new RegistroModel
+        {
+            Nombre = regNombre,
+            Correo = regEmail,
+            Telefono = regTelefono,
+            Password = regPassword,
+            ConfirmPassword = regConfirmPassword
+        };
+
+        var response = await AuthService.RegistrarAsync(model);
+        cargando = false;
+
+        if (response.Exito && !string.IsNullOrEmpty(response.Token))
+        {
+            exitoMsg = "¡Registro exitoso!";
+            await AuthStateProvider.MarkUserAsAuthenticated(response.Token);
+            StateHasChanged();
+            await Task.Delay(600);
+            CerrarModal();
+        }
+        else
+        {
+            errorMsg = response.Mensaje;
+        }
+    }
+
+    private bool dropdownOpen = false;
+    private bool confirmarLogoutVisible = false;
+
+    private void ToggleDropdown()
+    {
+        dropdownOpen = !dropdownOpen;
+    }
+
+    private void CloseDropdown()
+    {
+        dropdownOpen = false;
+    }
+
+    private void PedirConfirmacionLogout()
+    {
+        dropdownOpen = false;
+        confirmarLogoutVisible = true;
+    }
+
+    private void CancelarLogout()
+    {
+        confirmarLogoutVisible = false;
+    }
+
+    private async Task ConfirmarCerrarSesion()
+    {
+        confirmarLogoutVisible = false;
+        await AuthStateProvider.MarkUserAsLoggedOut();
+        Nav.NavigateTo("/");
+    }
+}

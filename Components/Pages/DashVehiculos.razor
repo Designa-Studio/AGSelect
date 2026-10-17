@@ -1,0 +1,338 @@
+@page "/dashboard/vehiculos"
+@layout DashboardLayout
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using BlazorAGS.Models
+@using BlazorAGS.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject BookingService BookingService
+
+<PageTitle>Mis Vehículos | AGS Select</PageTitle>
+
+<DashSidebar />
+
+<main class="dash-main text-white">
+    <div class="dash-topbar d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="dash-page-title mb-0 text-white fw-bold">Mis Vehículos</h1>
+            <span class="text-gray text-xs">Gestiona tu garaje virtual e historial de servicios</span>
+        </div>
+        <button class="btn btn-ags-red px-4 py-2 text-white fw-bold" style="border-radius: 8px;" @onclick="AbrirModalAgregar">
+            <i class="fa-solid fa-plus me-1"></i> Agregar Vehículo
+        </button>
+    </div>
+
+    @if (cargando)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-danger" role="status"></div>
+            <p class="text-gray text-xs mt-2">Cargando vehículos...</p>
+        </div>
+    }
+    else if (!Vehiculos.Any())
+    {
+        <div class="dash-card text-center py-5" style="background: #0b0c10; border: 1px solid #171a24; border-radius: 14px;">
+            <i class="fa-solid fa-car-side text-gray display-4 mb-3 opacity-50"></i>
+            <h4 class="text-white fw-bold mb-2">Aún no tienes vehículos registrados</h4>
+            <p class="text-gray text-sm mb-4">Agrega tus automóviles para agilizar tus reservas y llevar el historial de mantenimientos.</p>
+            <button class="btn-ags-red py-2 px-4 d-inline-flex align-items-center gap-2" @onclick="AbrirModalAgregar">
+                <i class="fa-solid fa-plus"></i> Registrar Primer Vehículo
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+            @foreach (var vehiculo in Vehiculos)
+            {
+                <div class="col-12 col-md-6 col-xl-4">
+                    <div class="dash-card h-100 d-flex flex-column" style="background: #0b0c10; border: 1px solid #171a24; border-radius: 14px; padding: 24px;">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="me-3 p-3 rounded-circle" style="background: rgba(230,0,0,0.1);">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#e60000" class="bi bi-car-front-fill" viewBox="0 0 16 16">
+                                        <path d="M2.52 3.515A2.5 2.5 0 0 1 4.82 2h6.362c1 0 1.904.596 2.298 1.515l.792 1.848c.075.175.21.319.38.404.5.25.855.715.965 1.262l.335 1.679q.05.242.049.49v.413c0 .814-.39 1.543-1 1.997V13.5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1-.5.5v-1.338c-1.292.048-2.745.088-4 .088s-2.708-.04-4-.088V13.5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1-.5-.5v-1.892c-.61-.454-1-1.183-1-1.997v-.413a2.5 2.5 0 0 1 .049-.49l.335-1.68c.11-.546.465-1.012.964-1.261a.8.8 0 0 0 .381-.404l.792-1.848ZM3 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2m10 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2M6 8a1 1 0 0 0 0 2h4a1 1 0 1 0 0-2zM2.906 5.189a.51.51 0 0 0 .497.731c.91-.073 3.35-.17 4.597-.17s3.688.097 4.597.17a.51.51 0 0 0 .497-.731l-.956-1.913A.5.5 0 0 0 11.692 3H4.308a.5.5 0 0 0-.447.276L2.906 5.19Z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="dash-card-title text-white fw-bold mb-1 fs-5">@vehiculo.Marca @vehiculo.Modelo</h3>
+                                    <div class="text-gray text-xs">@(string.IsNullOrEmpty(vehiculo.Anio) ? "Año N/A" : vehiculo.Anio) • @(string.IsNullOrEmpty(vehiculo.Color) ? "Color N/A" : vehiculo.Color) • @vehiculo.Tipo</div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn text-gray hover-red border-0 p-1" title="Eliminar Vehículo" @onclick="() => ConfirmarEliminar(vehiculo.Id)">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="mt-auto pt-3 border-top" style="border-color: #171a24 !important;">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <span class="text-gray text-xs">Placa: <strong class="text-white">@(string.IsNullOrEmpty(vehiculo.Placa) ? "Sin registrar" : vehiculo.Placa)</strong></span>
+                                <span class="badge bg-secondary bg-opacity-25 text-gray text-xs">@vehiculo.Tipo</span>
+                            </div>
+                            <button class="btn btn-ags-outline w-100 text-white fw-bold py-2" style="border: 1px solid #171a24; border-radius: 8px;" @onclick="() => AbrirHistorial(vehiculo)">
+                                <i class="fa-solid fa-clock-rotate-left me-1"></i> Ver Historial
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</main>
+
+<!-- MODAL AGREGAR VEHÍCULO -->
+@if (modalAgregarVisible)
+{
+    <div class="auth-overlay" @onclick="CerrarModalAgregar">
+        <div class="auth-modal p-4" style="max-width: 500px;" @onclick:stopPropagation="true">
+            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom border-dark">
+                <h5 class="text-white fw-bold mb-0">Registrar Nuevo Vehículo</h5>
+                <button type="button" class="btn-close btn-close-white" @onclick="CerrarModalAgregar"></button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorModal))
+            {
+                <div class="auth-error-msg mb-3">
+                    <i class="fa-solid fa-circle-exclamation me-2"></i>@errorModal
+                </div>
+            }
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="ags-form-label">Tipo de Vehículo *</label>
+                    <select class="ags-form-select" @bind="nuevoVehiculo.Tipo">
+                        <option value="Car">Automóvil (Car)</option>
+                        <option value="Jeepeta">Jeepeta</option>
+                        <option value="SUV">SUV</option>
+                        <option value="Camioneta">Camioneta</option>
+                        <option value="Minivan">Minivan</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="ags-form-label">Marca *</label>
+                    <input type="text" class="ags-form-input" placeholder="Porsche, BMW, Toyota..." @bind="nuevoVehiculo.Marca" />
+                </div>
+                <div class="col-md-6">
+                    <label class="ags-form-label">Modelo *</label>
+                    <input type="text" class="ags-form-input" placeholder="911 GT3, M3, Rav4..." @bind="nuevoVehiculo.Modelo" />
+                </div>
+                <div class="col-md-6">
+                    <label class="ags-form-label">Año</label>
+                    <input type="text" class="ags-form-input" placeholder="2024" @bind="nuevoVehiculo.Anio" />
+                </div>
+                <div class="col-md-6">
+                    <label class="ags-form-label">Color</label>
+                    <input type="text" class="ags-form-input" placeholder="Negro, Blanco, Azul..." @bind="nuevoVehiculo.Color" />
+                </div>
+                <div class="col-md-6">
+                    <label class="ags-form-label">Placa (opcional)</label>
+                    <input type="text" class="ags-form-input" placeholder="A123456" @bind="nuevoVehiculo.Placa" />
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 justify-content-end mt-4">
+                <button type="button" class="btn btn-outline-secondary text-white py-2 px-3 text-xs rounded-3" @onclick="CerrarModalAgregar">
+                    Cancelar
+                </button>
+                <button type="button" class="btn-ags-red py-2 px-4 text-xs fw-bold rounded-3" @onclick="GuardarVehiculo" disabled="@guardando">
+                    @if (guardando)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                        <span>Guardando...</span>
+                    }
+                    else
+                    {
+                        <i class="fa-solid fa-floppy-disk me-1"></i>
+                        <span>Guardar Vehículo</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- MODAL HISTORIAL DE SERVICIOS -->
+@if (modalHistorialVisible && vehiculoSeleccionado != null)
+{
+    <div class="auth-overlay" @onclick="CerrarHistorial">
+        <div class="auth-modal p-4" style="max-width: 650px;" @onclick:stopPropagation="true">
+            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom border-dark">
+                <div>
+                    <h5 class="text-white fw-bold mb-0">Historial de Mantenimientos</h5>
+                    <span class="text-red text-xs fw-bold">@vehiculoSeleccionado.Marca @vehiculoSeleccionado.Modelo (@(string.IsNullOrEmpty(vehiculoSeleccionado.Anio) ? "Año N/A" : vehiculoSeleccionado.Anio))</span>
+                </div>
+                <button type="button" class="btn-close btn-close-white" @onclick="CerrarHistorial"></button>
+            </div>
+
+            @if (cargandoHistorial)
+            {
+                <div class="text-center py-4">
+                    <div class="spinner-border text-danger" role="status"></div>
+                </div>
+            }
+            else if (!historialReservas.Any())
+            {
+                <div class="text-center py-4">
+                    <i class="fa-solid fa-calendar-xmark text-gray display-6 mb-2 opacity-50"></i>
+                    <p class="text-gray text-xs mb-0">Este vehículo no posee registros de servicio aún.</p>
+                </div>
+            }
+            else
+            {
+                <div class="dash-table-wrap table-responsive style-scrollbar" style="max-height: 350px; background: #0b0c10; border-radius: 10px; border: 1px solid #171a24; padding: 10px;">
+                    <table class="dash-table table text-white mb-0" style="--bs-table-bg: transparent; --bs-table-color: #fff;">
+                        <thead>
+                            <tr class="text-gray text-xs" style="border-bottom: 1px solid #171a24;">
+                                <th class="bg-transparent border-0 text-gray fw-bold py-2">Fecha Cita</th>
+                                <th class="bg-transparent border-0 text-gray fw-bold py-2">Servicio Realizado</th>
+                                <th class="bg-transparent border-0 text-gray fw-bold py-2">Monto</th>
+                                <th class="bg-transparent border-0 text-gray fw-bold py-2">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in historialReservas)
+                            {
+                                var paqueteDetalle = item.Detalles.FirstOrDefault(d => d.Marca.Equals(vehiculoSeleccionado.Marca, StringComparison.OrdinalIgnoreCase))?.PaqueteServicio 
+                                    ?? item.Detalles.FirstOrDefault()?.PaqueteServicio ?? "Servicio Estándar";
+
+                                <tr style="border-bottom: 1px solid #171a24; background: transparent;">
+                                    <td class="align-middle border-0 py-3 text-white text-xs bg-transparent">@item.FechaReserva.ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td class="align-middle border-0 py-3 text-gray text-xs bg-transparent">@paqueteDetalle</td>
+                                    <td class="align-middle border-0 py-3 text-white fw-bold text-xs bg-transparent">$@item.MontoTotal.ToString("N2") DOP</td>
+                                    <td class="align-middle border-0 py-3 text-xs bg-transparent">
+                                        <span class="dash-badge @GetBadgeClass(item.Estado)">@item.Estado</span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            <div class="text-end mt-4">
+                <button type="button" class="btn btn-outline-secondary text-white py-2 px-4 text-xs rounded-3" @onclick="CerrarHistorial">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthStateTask { get; set; }
+
+    private int usuarioId = 0;
+    private bool cargando = true;
+    private bool guardando = false;
+    private bool modalAgregarVisible = false;
+    private bool modalHistorialVisible = false;
+    private bool cargandoHistorial = false;
+
+    private string errorModal = "";
+
+    private List<VehiculoDto> Vehiculos = new();
+    private VehiculoDto nuevoVehiculo = new();
+    private VehiculoDto? vehiculoSeleccionado = null;
+    private List<ReservaDto> historialReservas = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        cargando = true;
+        if (AuthStateTask != null)
+        {
+            var authState = await AuthStateTask;
+            var user = authState.User;
+            if (user.Identity != null && user.Identity.IsAuthenticated)
+            {
+                var idClaim = user.FindFirst(ClaimTypes.NameIdentifier);
+                if (idClaim != null && int.TryParse(idClaim.Value, out int id))
+                {
+                    usuarioId = id;
+                    await CargarVehiculos();
+                }
+            }
+        }
+        cargando = false;
+    }
+
+    private async Task CargarVehiculos()
+    {
+        if (usuarioId > 0)
+        {
+            Vehiculos = await BookingService.ObtenerVehiculosPorUsuarioAsync(usuarioId);
+        }
+    }
+
+    private void AbrirModalAgregar()
+    {
+        nuevoVehiculo = new VehiculoDto { UsuarioId = usuarioId, Tipo = "Car" };
+        errorModal = "";
+        modalAgregarVisible = true;
+    }
+
+    private void CerrarModalAgregar() => modalAgregarVisible = false;
+
+    private async Task GuardarVehiculo()
+    {
+        errorModal = "";
+        if (string.IsNullOrWhiteSpace(nuevoVehiculo.Marca) || string.IsNullOrWhiteSpace(nuevoVehiculo.Modelo))
+        {
+            errorModal = "Por favor ingresa la marca y el modelo del vehículo.";
+            return;
+        }
+
+        guardando = true;
+        nuevoVehiculo.UsuarioId = usuarioId;
+
+        int id = await BookingService.CrearVehiculoAsync(nuevoVehiculo);
+        guardando = false;
+
+        if (id > 0)
+        {
+            modalAgregarVisible = false;
+            await CargarVehiculos();
+        }
+        else
+        {
+            errorModal = "Ocurrió un error al guardar el vehículo. Intenta de nuevo.";
+        }
+    }
+
+    private async Task ConfirmarEliminar(int id)
+    {
+        bool exito = await BookingService.EliminarVehiculoAsync(id, usuarioId);
+        if (exito)
+        {
+            await CargarVehiculos();
+        }
+    }
+
+    private async Task AbrirHistorial(VehiculoDto veh)
+    {
+        vehiculoSeleccionado = veh;
+        modalHistorialVisible = true;
+        cargandoHistorial = true;
+
+        var todasReservas = await BookingService.ObtenerReservasPorUsuarioAsync(usuarioId);
+        historialReservas = todasReservas
+            .Where(r => r.Detalles.Any(d => d.Marca.Equals(veh.Marca, StringComparison.OrdinalIgnoreCase) || d.Modelo.Equals(veh.Modelo, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        cargandoHistorial = false;
+    }
+
+    private void CerrarHistorial()
+    {
+        modalHistorialVisible = false;
+        vehiculoSeleccionado = null;
+    }
+
+    private string GetBadgeClass(string estado) => estado?.ToLower() switch
+    {
+        "pendiente" => "badge-pending text-warning px-2 py-1 rounded",
+        "completada" or "completado" => "badge-done text-success px-2 py-1 rounded",
+        "cancelada" or "cancelado" => "text-red px-2 py-1 rounded",
+        _ => "text-white px-2 py-1 rounded"
+    };
+}

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <ResourcePreloader />
+    <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
+    <link rel="stylesheet" href="@Assets["css/ags-theme.css"]" />
+    <link rel="stylesheet" href="@Assets["BlazorAGS.styles.css"]" />
+    <ImportMap />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <title>AGS Select | Car Wash & Auto Detail Premium</title>
+    <HeadOutlet @rendermode="InteractiveServer" />
+</head>
+
+<body>
+    <!-- PAGE LOADER -->
+    <div id="page-loader">
+        <div class="loader-content">
+            <img src="/images/logo_ags.png" alt="AGS Select" class="loader-logo" />
+            <div class="loader-spinner"></div>
+            <span class="loader-text">Cargando...</span>
+        </div>
+    </div>
+
+    <Routes @rendermode="InteractiveServer" />
+    <ReconnectModal />
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script>
+        window.addEventListener('load', function () {
+            setTimeout(function () {
+                var loader = document.getElementById('page-loader');
+                if (loader) {
+                    loader.classList.add('loaded');
+                }
+            }, 1200);
+        });
+
+        // Descarga un PDF enviando un POST al endpoint y usando un blob para disparar la descarga
+        window.downloadPdfFromPost = async function (url) {
+            try {
+                const response = await fetch(url, { method: 'POST' });
+                if (!response.ok) throw new Error('Error al generar PDF');
+                const blob = await response.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                // Extraer filename del header Content-Disposition si está disponible
+                const disposition = response.headers.get('Content-Disposition');
+                let filename = 'AGS_Reporte.pdf';
+                if (disposition) {
+                    const match = disposition.match(/filename=([^;]+)/);
+                    if (match) filename = match[1].trim();
+                }
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(blobUrl);
+            } catch (e) {
+                console.error('Error descargando PDF:', e);
+                alert('Ocurrió un error al generar el PDF. Intenta nuevamente.');
+            }
+        };
+    </script>
+</body>
+
+</html>

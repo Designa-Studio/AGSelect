@@ -1,0 +1,137 @@
+@page "/dashboard/reservas"
+@layout DashboardLayout
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using BlazorAGS.Models
+@using BlazorAGS.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject BookingService BookingService
+
+<PageTitle>Mis Reservas | AGS Select</PageTitle>
+
+<DashSidebar />
+
+<main class="dash-main">
+    <div class="dash-topbar d-flex justify-content-between align-items-center mb-4">
+        <h1 class="dash-page-title mb-0 text-white fw-bold">Mis Reservas</h1>
+        <a href="/reserva" class="btn btn-ags-red px-4 py-2 text-white text-decoration-none fw-bold" style="border-radius: 8px;">+ Nueva Reserva</a>
+    </div>
+
+    <div class="dash-card">
+        <div class="dash-card-header d-flex gap-3 mb-4 border-bottom pb-3" style="border-color: #171a24 !important;">
+            <button class="btn @(ActiveTab == "Todas" ? "btn-ags-red text-white" : "btn-link-subtle text-gray") fw-bold text-decoration-none border-0" @onclick='() => ActiveTab = "Todas"'>Todas</button>
+            <button class="btn @(ActiveTab == "Pendientes" ? "btn-ags-red text-white" : "btn-link-subtle text-gray") fw-bold text-decoration-none border-0" @onclick='() => ActiveTab = "Pendientes"'>Pendientes</button>
+            <button class="btn @(ActiveTab == "Completadas" ? "btn-ags-red text-white" : "btn-link-subtle text-gray") fw-bold text-decoration-none border-0" @onclick='() => ActiveTab = "Completadas"'>Completadas</button>
+            <button class="btn @(ActiveTab == "Canceladas" ? "btn-ags-red text-white" : "btn-link-subtle text-gray") fw-bold text-decoration-none border-0" @onclick='() => ActiveTab = "Canceladas"'>Canceladas</button>
+        </div>
+
+        @if (cargando)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-border text-danger" role="status"></div>
+                <p class="text-gray text-xs mt-2">Cargando reservas...</p>
+            </div>
+        }
+        else if (!FilteredReservations.Any())
+        {
+            <div class="text-center py-5">
+                <i class="fa-solid fa-calendar-xmark text-gray display-4 mb-3"></i>
+                <p class="text-gray mb-3">No tienes reservas registradas en esta categoría.</p>
+                <a href="/reserva" class="btn-ags-red d-inline-flex align-items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Crear Nueva Reserva
+                </a>
+            </div>
+        }
+        else
+        {
+            <div class="dash-table-wrap table-responsive">
+                <table class="dash-table table text-white mb-0">
+                    <thead>
+                        <tr class="text-gray text-xs" style="border-bottom: 1px solid #171a24;">
+                            <th class="border-0 pb-3 fw-bold bg-transparent text-gray">Vehículo(s)</th>
+                            <th class="border-0 pb-3 fw-bold bg-transparent text-gray">Servicio(s)</th>
+                            <th class="border-0 pb-3 fw-bold bg-transparent text-gray">Fecha Cita</th>
+                            <th class="border-0 pb-3 fw-bold bg-transparent text-gray">Entrega</th>
+                            <th class="border-0 pb-3 fw-bold bg-transparent text-gray">Monto Total</th>
+                            <th class="border-0 pb-3 fw-bold bg-transparent text-gray">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var res in FilteredReservations)
+                        {
+                            var vehiculoTexto = res.Detalles.Any() 
+                                ? string.Join(", ", res.Detalles.Select(d => $"{d.Marca} {d.Modelo}"))
+                                : "Sin especificar";
+
+                            var servicioTexto = res.Detalles.Any()
+                                ? string.Join(", ", res.Detalles.Select(d => d.PaqueteServicio))
+                                : "Servicio Estándar";
+
+                            <tr style="border-bottom: 1px solid #171a24;">
+                                <td class="align-middle border-0 py-3 fw-bold bg-transparent text-white">
+                                    <i class="fa-solid fa-car text-red me-2"></i>@vehiculoTexto
+                                </td>
+                                <td class="align-middle border-0 py-3 text-gray bg-transparent">@servicioTexto</td>
+                                <td class="align-middle border-0 py-3 text-gray bg-transparent">@res.FechaReserva.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="align-middle border-0 py-3 text-gray bg-transparent">@res.OpcionEntrega</td>
+                                <td class="align-middle border-0 py-3 fw-bold bg-transparent text-white">$@res.MontoTotal.ToString("N2") DOP</td>
+                                <td class="align-middle border-0 py-3 bg-transparent">
+                                    <span class="dash-badge @GetBadgeClass(res.Estado)">@res.Estado</span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</main>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthStateTask { get; set; }
+
+    private string ActiveTab { get; set; } = "Todas";
+    private bool cargando = true;
+    private List<ReservaDto> Reservaciones = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        cargando = true;
+        int? usuarioId = null;
+
+        if (AuthStateTask != null)
+        {
+            var authState = await AuthStateTask;
+            var user = authState.User;
+            if (user.Identity != null && user.Identity.IsAuthenticated)
+            {
+                var idClaim = user.FindFirst(ClaimTypes.NameIdentifier);
+                if (idClaim != null && int.TryParse(idClaim.Value, out int id))
+                {
+                    usuarioId = id;
+                }
+            }
+        }
+
+        Reservaciones = await BookingService.ObtenerReservasPorUsuarioAsync(usuarioId);
+        cargando = false;
+    }
+
+    private IEnumerable<ReservaDto> FilteredReservations => ActiveTab switch
+    {
+        "Pendientes" => Reservaciones.Where(r => r.Estado.Equals("Pendiente", StringComparison.OrdinalIgnoreCase)),
+        "Completadas" => Reservaciones.Where(r => r.Estado.Equals("Completada", StringComparison.OrdinalIgnoreCase) || r.Estado.Equals("Completado", StringComparison.OrdinalIgnoreCase)),
+        "Canceladas" => Reservaciones.Where(r => r.Estado.Equals("Cancelada", StringComparison.OrdinalIgnoreCase) || r.Estado.Equals("Cancelado", StringComparison.OrdinalIgnoreCase)),
+        _ => Reservaciones
+    };
+
+    private string GetBadgeClass(string estado) => estado?.ToLower() switch
+    {
+        "pendiente" => "badge-pending text-warning px-2 py-1 rounded",
+        "completada" or "completado" => "badge-done text-success px-2 py-1 rounded",
+        "cancelada" or "cancelado" => "text-red px-2 py-1 rounded",
+        _ => "text-white px-2 py-1 rounded"
+    };
+}
+
